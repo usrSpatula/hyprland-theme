@@ -1,0 +1,88 @@
+{
+ "id": "test05",
+ "chapter": 5,
+ "title": "Delivery maths",
+ "runner": "edit",
+ "timeout": 25,
+ "story": "The pizzeria wants one place for all its delivery maths, so the till, the drivers' app and the manager's screen can all share it. Build it as a ModuleScript full of small, focused functions, then prove it works by using it from a Script.\n\nThe checker calls every function with lots of inputs, including awkward ones.",
+ "create": [
+  "A Folder named `Test05` inside `ServerScriptService.Course`.",
+  "A ModuleScript named `DeliveryMath` inside `Test05`, returning a table of functions.",
+  "A Script named `Shift` inside `Test05`."
+ ],
+ "requirements": [
+  {
+   "id": "r1",
+   "text": "A ModuleScript named `DeliveryMath` and a Script named `Shift`."
+  },
+  {
+   "id": "r2",
+   "text": "`DeliveryMath` returns a table with the functions `deliveryFee`, `isLate`, `split` and `orderTotal`."
+  },
+  {
+   "id": "r3",
+   "text": "`deliveryFee(distance)` returns 3 for a distance of 2 or less. Beyond that, it adds 2 for every unit of distance over 2, so a distance of 5 costs 9."
+  },
+  {
+   "id": "r4",
+   "text": "`isLate(promisedMinutes, actualMinutes)` returns exactly `true` when the actual time is more than the promised time, otherwise exactly `false`."
+  },
+  {
+   "id": "r5",
+   "text": "`split(total, people)` returns two values: how many each person gets (whole numbers only) and how many are left over. If `people` is 0 or less, it returns `0` and the whole `total` instead of erroring."
+  },
+  {
+   "id": "r6",
+   "text": "`orderTotal(...)` takes any number of prices and returns their sum, or 0 when given none."
+  },
+  {
+   "id": "r7",
+   "text": "`Shift` requires `DeliveryMath` and prints `Fee: 9` by calling `deliveryFee` with a distance of 5."
+  }
+ ],
+ "hints": [
+  "Start from the module template: a table at the top, functions added to it, and the table returned at the bottom.",
+  "For split, deal with the bad case first and return early, then use the two division operators that give whole parts and remainders.",
+  "orderTotal needs the three dots as its parameter. Count them with select and add each one up in a loop."
+ ],
+ "static": [
+  {
+   "id": "r1",
+   "type": "exists",
+   "path": "ServerScriptService.Course.Test05.DeliveryMath",
+   "class": "ModuleScript",
+   "fail": "Create a ModuleScript named `DeliveryMath` inside the `Test05` folder."
+  },
+  {
+   "id": "r1",
+   "type": "exists",
+   "path": "ServerScriptService.Course.Test05.Shift",
+   "class": "Script",
+   "fail": "Create a Script named `Shift` inside the `Test05` folder."
+  },
+  {
+   "id": "r6",
+   "type": "uses",
+   "path": "ServerScriptService.Course.Test05.DeliveryMath",
+   "pattern": "\\.\\.\\.",
+   "fail": "orderTotal should take its prices with three dots, so it works with any number of them."
+  },
+  {
+   "id": "r7",
+   "type": "uses",
+   "path": "ServerScriptService.Course.Test05.Shift",
+   "pattern": "\\brequire\\s*\\(",
+   "fail": "Shift should require the DeliveryMath module."
+  }
+ ],
+ "check": "local base = \"ServerScriptService.Course.Test05.\"\nlocal M, info = Course.load(base .. \"DeliveryMath\")\nlocal isTable = type(M) == \"table\"\nCourse.check(\"r2\", isTable, \"DeliveryMath should return a table of functions, but it returned \" .. Course.show(M) .. (if info.error then \" (\" .. info.error .. \")\" else \"\"))\nif isTable then\n\tfor _, name in { \"deliveryFee\", \"isLate\", \"split\", \"orderTotal\" } do\n\t\tCourse.check(\"r2\", type(M[name]) == \"function\", \"DeliveryMath.\" .. name .. \" should be a function, but it's \" .. Course.show(M[name]) .. \". Check the spelling and capitals.\")\n\tend\nend\n\nlocal function callAll(id, name, cases, compare)\n\tif not isTable or type(M[name]) ~= \"function\" then\n\t\tCourse.fail(id, \"Not checked: DeliveryMath.\" .. name .. \" is missing.\")\n\t\treturn\n\tend\n\tfor _, case in cases do\n\t\tlocal args, wanted = case[1], case[2]\n\t\tlocal results = table.pack(Course.call(M[name], table.unpack(args)))\n\t\tlocal label = name .. \"(\" .. table.concat((function()\n\t\t\tlocal shown = {}\n\t\t\tfor i = 1, #args do shown[i] = Course.show(args[i]) end\n\t\t\treturn shown\n\t\tend)(), \", \") .. \")\"\n\t\tif not results[1] then\n\t\t\tCourse.fail(id, label .. \" errored: \" .. tostring(results[2]))\n\t\telse\n\t\t\tlocal got = { table.unpack(results, 2, results.n) }\n\t\t\tCourse.check(id, compare(got, wanted), label .. \" should return \" .. Course.show(wanted) .. \", but returned \" .. Course.show(got))\n\t\tend\n\tend\nend\n\nlocal function firstNear(got, wanted)\n\treturn type(got[1]) == \"number\" and Course.near(got[1], wanted[1])\nend\nlocal function exactAll(got, wanted)\n\tif #got ~= #wanted then return false end\n\tfor i = 1, #wanted do\n\t\tif got[i] ~= wanted[i] then return false end\n\tend\n\treturn true\nend\n\ncallAll(\"r3\", \"deliveryFee\", { { { 0 }, { 3 } }, { { 1 }, { 3 } }, { { 2 }, { 3 } }, { { 3 }, { 5 } }, { { 5 }, { 9 } }, { { 10 }, { 19 } } }, firstNear)\ncallAll(\"r4\", \"isLate\", { { { 30, 31 }, { true } }, { { 30, 30 }, { false } }, { { 30, 10 }, { false } }, { { 0, 1 }, { true } } }, exactAll)\ncallAll(\"r5\", \"split\", { { { 17, 5 }, { 3, 2 } }, { { 20, 4 }, { 5, 0 } }, { { 3, 10 }, { 0, 3 } }, { { 7, 0 }, { 0, 7 } }, { { 9, -2 }, { 0, 9 } } }, exactAll)\ncallAll(\"r6\", \"orderTotal\", { { {}, { 0 } }, { { 12 }, { 12 } }, { { 10, 12.5, 8 }, { 30.5 } }, { { 1, 2, 3, 4, 5 }, { 15 } } }, firstNear)\n\nlocal run = Course.run(base .. \"Shift\")\nCourse.check(\"r7\", run.ok, \"Shift errored: \" .. tostring(run.error))\nCourse.check(\"r7\", table.find(run.prints, \"Fee: 9\") ~= nil, \"Shift should print `Fee: 9`, the fee for a distance of 5, worked out by calling DeliveryMath. It printed \" .. Course.show(run.prints))\n",
+ "steps": [
+  "In the `DeliveryMath` tab, make a table, add four functions to it (written as the table's name, a dot, then the function name), and `return` the table on the last line.",
+  "`deliveryFee(distance)`: a distance of 2 or less costs 3. Further than that costs 3 plus 2 for every unit past 2. So `deliveryFee(2)` gives `3`, and `deliveryFee(5)` gives `3 + 2 + 2 + 2 = 9`.",
+  "`isLate(promisedMinutes, actualMinutes)`: returns `true` if actual is more than promised, otherwise `false`. So `isLate(30, 31)` gives `true`, and `isLate(30, 30)` gives `false`.",
+  "`split(total, people)`: returns two numbers, how many each person gets (whole numbers) and how many are left over. So `split(17, 5)` gives `3, 2`. If people is 0 or less, return `0, total` instead.",
+  "`orderTotal(...)`: takes any number of prices and returns their sum. So `orderTotal(10, 12.5, 8)` gives `30.5`, and `orderTotal()` gives `0`.",
+  "In the `Shift` tab, require the module with `require(script.Parent.DeliveryMath)`, then print `Fee: ` followed by the fee for a distance of 5."
+ ],
+ "example": "Running the Shift tab prints:\nFee: 9"
+}

@@ -1,0 +1,103 @@
+{
+ "id": "test13",
+ "chapter": 13,
+ "title": "Never lose a driver's pay",
+ "runner": "edit",
+ "timeout": 25,
+ "story": "The pizzeria's drivers are paid in coins that must survive every server crash, network hiccup and shutdown. Build the profile system that loads, protects and saves their progress, and the state machine that runs each night's rounds.\n\nThe checker hands your Profiles module a fake DataStore that fails on purpose, to make sure nobody's pay is ever wiped.",
+ "create": [
+  "A Folder named `Test13` inside `ServerScriptService.Course`.",
+  "A ModuleScript named `Profiles` inside it: a class, created with `Profiles.new(store)`.",
+  "A ModuleScript named `Round` inside it: a class, created with `Round.new()`."
+ ],
+ "requirements": [
+  {
+   "id": "r1",
+   "text": "ModuleScripts named `Profiles` and `Round`."
+  },
+  {
+   "id": "r2",
+   "text": "`Profiles.new(store)` returns an object with the methods `load`, `get`, `addCoins`, `save` and `release`. It uses only the `store` it's given (which has `GetAsync`, `SetAsync` and `UpdateAsync` methods, called with a colon). Keys look like `\"Player_\" .. userId`."
+  },
+  {
+   "id": "r3",
+   "text": "`profiles:load(userId)` reads the player's save. For a new player (nothing saved) it creates `{ Coins = 0, Deliveries = 0 }`, a separate table for every player, and returns `true`. `profiles:get(userId)` returns the session data, or `nil`."
+  },
+  {
+   "id": "r4",
+   "text": "When a save exists, `load` uses it, and fills in any field it's missing from the defaults."
+  },
+  {
+   "id": "r5",
+   "text": "If reading fails (the call errors), `load` tries again, up to 3 attempts in total. If all 3 fail, it returns `false` and the player has no session data."
+  },
+  {
+   "id": "r6",
+   "text": "`profiles:addCoins(userId, amount)` adds to the player's coins and returns the new total. It returns `nil` and changes nothing if the amount isn't a positive number or the player's data isn't loaded."
+  },
+  {
+   "id": "r7",
+   "text": "`profiles:save(userId)` saves the session data with `UpdateAsync` and returns `true`. It returns `false`, without erroring, if saving fails or the player's data never loaded, and in that case it must never change their stored save."
+  },
+  {
+   "id": "r8",
+   "text": "`profiles:release(userId)` saves the player, then forgets their session data, and returns what `save` returned."
+  },
+  {
+   "id": "r9",
+   "text": "`Round.new()` makes a state machine that starts in `\"Waiting\"`. `round:start()` moves Waiting to `\"Intermission\"` and returns `true` (otherwise `false`). `round:advance()` moves Intermission to `\"Playing\"`, Playing to `\"Results\"`, and Results back to Intermission, returning `false` while Waiting. `round:getState()` returns the state, and `round:onChanged(fn)` registers a function called with the old and new state on every change."
+  }
+ ],
+ "hints": [
+  "Profiles is a class whose objects hold the store and a sessions table keyed by userId. Copy the defaults into a new table for each player.",
+  "Wrap each GetAsync in pcall inside a loop of up to 3 attempts, and break when one works. Only create session data after a success.",
+  "In save, return false straight away when there's no session data. Otherwise pcall an UpdateAsync whose function returns the session data. Round needs a table of what comes after each state, and a list of callbacks to call in one change function."
+ ],
+ "static": [
+  {
+   "id": "r1",
+   "type": "exists",
+   "path": "ServerScriptService.Course.Test13.Profiles",
+   "class": "ModuleScript",
+   "fail": "Create a ModuleScript named `Profiles` in the `Test13` folder."
+  },
+  {
+   "id": "r1",
+   "type": "exists",
+   "path": "ServerScriptService.Course.Test13.Round",
+   "class": "ModuleScript",
+   "fail": "Create a ModuleScript named `Round` in the `Test13` folder."
+  },
+  {
+   "id": "r5",
+   "type": "uses",
+   "path": "ServerScriptService.Course.Test13.Profiles",
+   "pattern": "\\bpcall\\s*\\(",
+   "fail": "Wrap the store calls in pcall."
+  },
+  {
+   "id": "r7",
+   "type": "uses",
+   "path": "ServerScriptService.Course.Test13.Profiles",
+   "pattern": "UpdateAsync",
+   "fail": "save should use UpdateAsync."
+  },
+  {
+   "id": "r2",
+   "type": "avoids",
+   "path": "ServerScriptService.Course.Test13.Profiles",
+   "pattern": "DataStoreService",
+   "fail": "Profiles should only use the store it's given, not fetch DataStoreService itself."
+  }
+ ],
+ "check": "local base = \"ServerScriptService.Course.Test13.\"\nlocal function copy(value)\n\tif type(value) ~= \"table\" then\n\t\treturn value\n\tend\n\tlocal out = {}\n\tfor k, v in value do\n\t\tout[k] = copy(v)\n\tend\n\treturn out\nend\nlocal function makeStore()\n\tlocal store = { data = {}, calls = { get = 0, set = 0, update = 0 }, failGets = 0, failUpdates = 0 }\n\tfunction store:GetAsync(key)\n\t\tself.calls.get += 1\n\t\tif self.failGets > 0 then\n\t\t\tself.failGets -= 1\n\t\t\terror(\"DataStore request failed (pretend)\")\n\t\tend\n\t\treturn copy(self.data[key])\n\tend\n\tfunction store:SetAsync(key, value)\n\t\tself.calls.set += 1\n\t\tself.data[key] = copy(value)\n\tend\n\tfunction store:UpdateAsync(key, transform)\n\t\tself.calls.update += 1\n\t\tif self.failUpdates > 0 then\n\t\t\tself.failUpdates -= 1\n\t\t\terror(\"DataStore request failed (pretend)\")\n\t\tend\n\t\tlocal result = transform(copy(self.data[key]))\n\t\tif result ~= nil then\n\t\t\tself.data[key] = copy(result)\n\t\tend\n\t\treturn copy(result)\n\tend\n\treturn store\nend\n\nlocal Profiles, info = Course.load(base .. \"Profiles\")\nlocal ok = type(Profiles) == \"table\" and type(Profiles.new) == \"function\"\nCourse.check(\"r2\", ok, \"Profiles should return a class table with a new function, but returned \" .. Course.show(Profiles) .. (if info.error then \" (\" .. info.error .. \")\" else \"\"))\nif ok then\n\tlocal store = makeStore()\n\tlocal good, profiles = Course.call(Profiles.new, store)\n\tif not good or type(profiles) ~= \"table\" then\n\t\tCourse.fail(\"r2\", \"Profiles.new(store) should return an object, but \" .. (if good then \"returned \" .. Course.show(profiles) else \"errored: \" .. tostring(profiles)))\n\telse\n\t\tlocal function call(method, ...)\n\t\t\tif type(profiles[method]) ~= \"function\" then\n\t\t\t\treturn \"missing\"\n\t\t\tend\n\t\t\tlocal results = table.pack(Course.call(profiles[method], profiles, ...))\n\t\t\tif not results[1] then\n\t\t\t\treturn \"error\", results[2]\n\t\t\tend\n\t\t\treturn table.unpack(results, 2, results.n)\n\t\tend\n\t\tfor _, method in { \"load\", \"get\", \"addCoins\", \"save\", \"release\" } do\n\t\t\tCourse.check(\"r2\", type(profiles[method]) == \"function\", \"Profile objects should have a \" .. method .. \" method.\")\n\t\tend\n\n\t\tlocal loaded = call(\"load\", 1)\n\t\tCourse.check(\"r3\", loaded == true and Course.equal(call(\"get\", 1), { Coins = 0, Deliveries = 0 }), \"Loading a brand new player (nothing saved) should return true and give them {Coins = 0, Deliveries = 0}, but load returned \" .. Course.show(loaded) .. \" and get returned \" .. Course.show(call(\"get\", 1)))\n\t\tlocal loadedB = call(\"load\", 5)\n\t\tlocal a, b = call(\"get\", 1), call(\"get\", 5)\n\t\tif type(a) == \"table\" and type(b) == \"table\" then\n\t\t\ta.Coins = 999\n\t\t\tCourse.check(\"r3\", b.Coins == 0, \"Two new players must get separate tables. Changing one player's coins changed another's, so they're sharing the defaults table.\")\n\t\t\ta.Coins = 0\n\t\tend\n\n\t\tstore.data[\"Player_2\"] = { Coins = 75 }\n\t\tlocal loaded2 = call(\"load\", 2)\n\t\tlocal data2 = call(\"get\", 2)\n\t\tCourse.check(\"r4\", loaded2 == true and type(data2) == \"table\" and data2.Coins == 75 and data2.Deliveries == 0, \"A save of {Coins = 75} should load as {Coins = 75, Deliveries = 0}, keeping the coins and filling in the missing field, but got \" .. Course.show(data2))\n\t\tCourse.check(\"r4\", store.calls.get >= 1, \"load should read the store with GetAsync.\")\n\n\t\tstore.calls.get = 0\n\t\tstore.failGets = 2\n\t\tlocal loaded3 = call(\"load\", 3)\n\t\tCourse.check(\"r5\", loaded3 == true and store.calls.get == 3 and type(call(\"get\", 3)) == \"table\", \"When GetAsync fails twice then works, load should try 3 times and succeed. It returned \" .. Course.show(loaded3) .. \" after \" .. store.calls.get .. \" attempts.\")\n\t\tstore.calls.get = 0\n\t\tstore.failGets = 10\n\t\tlocal loaded4 = call(\"load\", 4)\n\t\tCourse.check(\"r5\", loaded4 == false and store.calls.get == 3 and call(\"get\", 4) == nil, \"When GetAsync keeps failing, load should give up after 3 attempts, return false, and leave no data for that player. It returned \" .. Course.show(loaded4) .. \" after \" .. store.calls.get .. \" attempts, and get returned \" .. Course.show(call(\"get\", 4)))\n\t\tstore.failGets = 0\n\n\t\tlocal total = call(\"addCoins\", 1, 10)\n\t\tCourse.check(\"r6\", total == 10 and call(\"get\", 1).Coins == 10, \"addCoins(1, 10) for a player with 0 coins should return 10, but returned \" .. Course.show(total))\n\t\tlocal bad = { call(\"addCoins\", 1, -5), call(\"addCoins\", 1, \"7\"), call(\"addCoins\", 1, 0) }\n\t\tCourse.check(\"r6\", bad[1] == nil and bad[2] == nil and bad[3] == nil and call(\"get\", 1).Coins == 10, \"addCoins should ignore amounts that aren't positive numbers, returning nil and changing nothing, but returned \" .. Course.show(bad))\n\t\tCourse.check(\"r6\", call(\"addCoins\", 4, 5) == nil, \"addCoins for a player whose data didn't load should return nil.\")\n\n\t\tstore.calls.set, store.calls.update = 0, 0\n\t\tlocal saved = call(\"save\", 1)\n\t\tCourse.check(\"r7\", saved == true and type(store.data[\"Player_1\"]) == \"table\" and store.data[\"Player_1\"].Coins == 10, \"save(1) should return true and store {Coins = 10, Deliveries = 0} under \\\"Player_1\\\", but returned \" .. Course.show(saved) .. \" and the store holds \" .. Course.show(store.data[\"Player_1\"]))\n\t\tCourse.check(\"r7\", store.calls.update >= 1 and store.calls.set == 0, \"save should use UpdateAsync, not SetAsync.\")\n\t\tstore.data[\"Player_4\"] = { Coins = 500, Deliveries = 40 }\n\t\tlocal savedFailed = call(\"save\", 4)\n\t\tCourse.check(\"r7\", savedFailed == false and store.data[\"Player_4\"].Coins == 500, \"save for a player whose data never loaded must return false and never touch their real save, but returned \" .. Course.show(savedFailed) .. \" and the save now holds \" .. Course.show(store.data[\"Player_4\"]))\n\t\tstore.failUpdates = 5\n\t\tlocal savedError = call(\"save\", 1)\n\t\tCourse.check(\"r7\", savedError == false, \"When UpdateAsync errors, save should return false without erroring, but returned \" .. Course.show(savedError))\n\t\tstore.failUpdates = 0\n\n\t\tcall(\"addCoins\", 2, 25)\n\t\tlocal released = call(\"release\", 2)\n\t\tCourse.check(\"r8\", released == true and store.data[\"Player_2\"].Coins == 100 and call(\"get\", 2) == nil, \"release(2) should save the player's data (Coins 100 now) and then forget their session data, returning true, but returned \" .. Course.show(released) .. \" with \" .. Course.show(store.data[\"Player_2\"]) .. \" saved and get(2) = \" .. Course.show(call(\"get\", 2)))\n\tend\nend\nif not ok then\n\tfor _, id in { \"r3\", \"r4\", \"r5\", \"r6\", \"r7\", \"r8\" } do\n\t\tCourse.fail(id, \"Not checked: Profiles didn't load.\")\n\tend\nend\n\nlocal Round, roundInfo = Course.load(base .. \"Round\")\nif type(Round) ~= \"table\" or type(Round.new) ~= \"function\" then\n\tCourse.fail(\"r9\", \"Round should return a class table with a new function, but returned \" .. Course.show(Round) .. (if roundInfo.error then \" (\" .. roundInfo.error .. \")\" else \"\"))\nelse\n\tCourse.try(\"r9\", function()\n\t\tlocal _, round = Course.call(Round.new)\n\t\tlocal changes = {}\n\t\tround:onChanged(function(old, new)\n\t\t\ttable.insert(changes, old .. \">\" .. new)\n\t\tend)\n\t\tCourse.check(\"r9\", round:getState() == \"Waiting\", \"A new round should start in the Waiting state, but it's \" .. Course.show(round:getState()))\n\t\tCourse.check(\"r9\", round:advance() == false and round:getState() == \"Waiting\", \"advance() before start() should return false and change nothing.\")\n\t\tCourse.check(\"r9\", round:start() == true and round:getState() == \"Intermission\", \"start() from Waiting should return true and move to Intermission.\")\n\t\tCourse.check(\"r9\", round:start() == false, \"start() when already started should return false.\")\n\t\tlocal sequence = {}\n\t\tfor _ = 1, 4 do\n\t\t\tround:advance()\n\t\t\ttable.insert(sequence, round:getState())\n\t\tend\n\t\tCourse.check(\"r9\", Course.equal(sequence, { \"Playing\", \"Results\", \"Intermission\", \"Playing\" }), \"advance() should cycle Intermission, Playing, Results, Intermission and so on, but gave \" .. Course.show(sequence))\n\t\tCourse.check(\"r9\", Course.equal(changes, { \"Waiting>Intermission\", \"Intermission>Playing\", \"Playing>Results\", \"Results>Intermission\", \"Intermission>Playing\" }), \"onChanged callbacks should be called with the old and new state on every change, and only on real changes. They saw \" .. Course.show(changes))\n\tend)\nend\n",
+ "steps": [
+  "**Profiles tab:** a class made with `Profiles.new(store)`. Only ever use the store it's given, with `store:GetAsync(key)` and `store:UpdateAsync(key, function)`. A player's key is `\"Player_\" .. userId`.",
+  "`profiles:load(userId)`: call GetAsync inside `pcall`, trying up to 3 times. If nothing was saved, give the player a new `{ Coins = 0, Deliveries = 0 }` (a fresh table for each player). If the save is missing a field, fill it in from those defaults. Return `true`. If all 3 tries fail, return `false` and don't give them any data.",
+  "`profiles:get(userId)` returns their data, or `nil`.",
+  "`profiles:addCoins(userId, amount)`: only for a positive number amount and a loaded player. Add the amount and return the new total. Otherwise return `nil`.",
+  "`profiles:save(userId)`: call UpdateAsync inside `pcall`, with a function that returns their data. Return `true` if it worked, and `false` if it failed or the player never loaded.",
+  "`profiles:release(userId)`: save, then forget their data, and return what save returned.",
+  "**Round tab:** a class. `Round.new()` starts in `\"Waiting\"`. `start()` moves Waiting to Intermission and returns `true`, otherwise it returns `false`. `advance()` goes Intermission to Playing, Playing to Results, and Results back to Intermission, but returns `false` while Waiting. `getState()` returns the state, and `onChanged(fn)` calls `fn(oldState, newState)` on every change."
+ ]
+}

@@ -1,0 +1,189 @@
+{
+ "title": "Luau Course",
+ "chapters": [
+  {
+   "id": "ch01",
+   "number": 1,
+   "title": "Your first scripts",
+   "summary": "Where scripts live, printing, comments, errors, and how code runs.",
+   "lessons": [
+    "ch01-l1",
+    "ch01-l2",
+    "ch01-l3",
+    "ch01-l4"
+   ],
+   "test": "test01"
+  },
+  {
+   "id": "ch02",
+   "number": 2,
+   "title": "Values and variables",
+   "summary": "Variables, numbers, strings, booleans, nil, and updating values.",
+   "lessons": [
+    "ch02-l1",
+    "ch02-l2",
+    "ch02-l3",
+    "ch02-l4",
+    "ch02-l5"
+   ],
+   "test": "test02"
+  },
+  {
+   "id": "ch03",
+   "number": 3,
+   "title": "Making decisions",
+   "summary": "if statements, and/or/not, truthiness, and if-expressions.",
+   "lessons": [
+    "ch03-l1",
+    "ch03-l2",
+    "ch03-l3",
+    "ch03-l4"
+   ],
+   "test": "test03"
+  },
+  {
+   "id": "ch04",
+   "number": 4,
+   "title": "Loops",
+   "summary": "for, while and repeat loops, break and continue, and common loop patterns.",
+   "lessons": [
+    "ch04-l1",
+    "ch04-l2",
+    "ch04-l3",
+    "ch04-l4"
+   ],
+   "test": "test04"
+  },
+  {
+   "id": "ch05",
+   "number": 5,
+   "title": "Functions and modules",
+   "summary": "Functions, return values, scope, functions as values, and your first ModuleScripts.",
+   "lessons": [
+    "ch05-l1",
+    "ch05-l2",
+    "ch05-l3",
+    "ch05-l4",
+    "ch05-l5"
+   ],
+   "test": "test05"
+  },
+  {
+   "id": "ch06",
+   "number": 6,
+   "title": "Tables",
+   "summary": "Arrays, the table library, dictionaries, references, sets and lookup tables.",
+   "lessons": [
+    "ch06-l1",
+    "ch06-l2",
+    "ch06-l3",
+    "ch06-l4",
+    "ch06-l5"
+   ],
+   "test": "test06"
+  },
+  {
+   "id": "ch07",
+   "number": 7,
+   "title": "Strings and maths",
+   "summary": "String methods, patterns, formatting, the math library and randomness.",
+   "lessons": [
+    "ch07-l1",
+    "ch07-l2",
+    "ch07-l3",
+    "ch07-l4",
+    "ch07-l5"
+   ],
+   "test": "test07"
+  },
+  {
+   "id": "ch08",
+   "number": 8,
+   "title": "Closures, errors and modules",
+   "summary": "Closures, higher-order functions, error handling, debugging, and module patterns.",
+   "lessons": [
+    "ch08-l1",
+    "ch08-l2",
+    "ch08-l3",
+    "ch08-l4",
+    "ch08-l5"
+   ],
+   "test": "test08"
+  },
+  {
+   "id": "ch09",
+   "number": 9,
+   "title": "Metatables, OOP and types",
+   "summary": "Metatables and metamethods, classes, inheritance, and Luau's type system.",
+   "lessons": [
+    "ch09-l1",
+    "ch09-l2",
+    "ch09-l3",
+    "ch09-l4",
+    "ch09-l5"
+   ],
+   "test": "test09"
+  },
+  {
+   "id": "ch10",
+   "number": 10,
+   "title": "Tasks and coroutines",
+   "summary": "How Roblox schedules code, the task library, coroutines, and timing patterns.",
+   "lessons": [
+    "ch10-l1",
+    "ch10-l2",
+    "ch10-l3",
+    "ch10-l4"
+   ],
+   "test": "test10"
+  },
+  {
+   "id": "ch11",
+   "number": 11,
+   "title": "Instances, 3D maths and events",
+   "summary": "The DataModel, creating instances, attributes and tags, Vector3 and CFrame, and events.",
+   "lessons": [
+    "ch11-l1",
+    "ch11-l2",
+    "ch11-l3",
+    "ch11-l4",
+    "ch11-l5"
+   ],
+   "test": "test11"
+  },
+  {
+   "id": "ch12",
+   "number": 12,
+   "title": "Players, client and server, UI",
+   "summary": "Players and characters, replication, remotes and security, and user interface.",
+   "lessons": [
+    "ch12-l1",
+    "ch12-l2",
+    "ch12-l3",
+    "ch12-l4"
+   ],
+   "test": "test12"
+  },
+  {
+   "id": "ch13",
+   "number": 13,
+   "title": "Saving data and game structure",
+   "summary": "DataStores, safe saving, state machines, and structuring a whole game.",
+   "lessons": [
+    "ch13-l1",
+    "ch13-l2",
+    "ch13-l3",
+    "ch13-l4"
+   ],
+   "test": "test13"
+  }
+ ],
+ "final": {
+  "title": "Final exam",
+  "tests": [
+   "final1",
+   "final2",
+   "final3"
+  ]
+ }
+}

@@ -1,0 +1,78 @@
+{
+ "id": "test10",
+ "chapter": 10,
+ "title": "The night shift timers",
+ "runner": "edit",
+ "timeout": 45,
+ "story": "The night shift runs on timers: countdowns before the doors lock, a list of customers to work through one at a time, deliveries that must give up if nobody answers, and ovens that all bake at once. Build the timing toolkit.\n\nThis check waits in real time, so it takes around 20 seconds.",
+ "create": [
+  "A Folder named `Test10` inside `ServerScriptService.Course`.",
+  "A ModuleScript named `NightShift` inside `Test10`, returning a table of functions."
+ ],
+ "requirements": [
+  {
+   "id": "r1",
+   "text": "A ModuleScript named `NightShift`."
+  },
+  {
+   "id": "r2",
+   "text": "It returns a table with `countdown`, `makeGenerator`, `withTimeout` and `runAll`."
+  },
+  {
+   "id": "r3",
+   "text": "`countdown(seconds, onTick, onDone)` returns straight away and counts down in the background: it calls `onTick(seconds)`, then a second later `onTick(seconds - 1)`, and so on down to `onTick(1)`, then a second after that calls `onDone()` once."
+  },
+  {
+   "id": "r4",
+   "text": "`countdown` returns a function that cancels it. After cancelling, no more ticks happen and `onDone` is never called."
+  },
+  {
+   "id": "r5",
+   "text": "`makeGenerator(list)` uses a coroutine and returns a function. Each call returns the next item of the list, and once the list runs out it returns `nil` every time, without erroring. Each generator keeps its own place."
+  },
+  {
+   "id": "r6",
+   "text": "`withTimeout(seconds, job)` runs `job()` in a new thread and waits. If the job finishes in time it returns `true` and the job's result. If not, it returns `false, \"timed out\"` once the time is up."
+  },
+  {
+   "id": "r7",
+   "text": "`runAll(jobs)` runs every function in the `jobs` array side by side, waits until all of them have finished, and returns their results in the same order as the jobs."
+  }
+ ],
+ "hints": [
+  "countdown needs task.spawn so it doesn't hold up its caller, and a flag that the loop checks after each wait, so cancelling can stop it.",
+  "For makeGenerator, a coroutine that yields each item is the core. Keep track of whether it has finished, so later calls can return nil instead of resuming a dead coroutine.",
+  "withTimeout and runAll both start threads and then wait in short steps. withTimeout watches a done flag against a deadline; runAll counts how many jobs are still running and stores each result at its job's index."
+ ],
+ "static": [
+  {
+   "id": "r1",
+   "type": "exists",
+   "path": "ServerScriptService.Course.Test10.NightShift",
+   "class": "ModuleScript",
+   "fail": "Create a ModuleScript named `NightShift` inside the `Test10` folder."
+  },
+  {
+   "id": "r5",
+   "type": "uses",
+   "path": "ServerScriptService.Course.Test10.NightShift",
+   "pattern": "\\bcoroutine\\.(create|wrap|yield)\\b",
+   "fail": "makeGenerator should use a coroutine."
+  },
+  {
+   "id": "r3",
+   "type": "avoids",
+   "path": "ServerScriptService.Course.Test10.NightShift",
+   "pattern": "(?<![\\w.])(wait|spawn|delay)\\s*\\(",
+   "fail": "Use the task library (task.wait, task.spawn, task.delay), not the deprecated wait, spawn and delay."
+  }
+ ],
+ "check": "local path = \"ServerScriptService.Course.Test10.NightShift\"\nlocal M, info = Course.load(path)\nlocal ok = type(M) == \"table\"\nCourse.check(\"r2\", ok, \"NightShift should return a table of functions, but it returned \" .. Course.show(M) .. (if info.error then \" (\" .. info.error .. \")\" else \"\"))\nfor _, name in { \"countdown\", \"makeGenerator\", \"withTimeout\", \"runAll\" } do\n\tif ok then\n\t\tCourse.check(\"r2\", type(M[name]) == \"function\", \"NightShift.\" .. name .. \" should be a function, but it's \" .. Course.show(M[name]) .. \".\")\n\tend\nend\nlocal function has(id, name)\n\tif ok and type(M[name]) == \"function\" then\n\t\treturn true\n\tend\n\tCourse.fail(id, \"Not checked: NightShift.\" .. name .. \" is missing.\")\n\treturn false\nend\n\nif has(\"r3\", \"countdown\") then\n\tCourse.try(\"r3\", function()\n\t\tlocal ticks, done = {}, 0\n\t\tlocal good, cancel = Course.call(M.countdown, 3, function(n) table.insert(ticks, n) end, function() done += 1 end)\n\t\tCourse.check(\"r3\", good and done == 0, \"countdown should return straight away, before the countdown finishes, but \" .. (if good then \"onDone had already run when it returned\" else \"it errored: \" .. tostring(cancel)))\n\t\tCourse.check(\"r4\", type(cancel) == \"function\", \"countdown should return a cancel function, but returned \" .. Course.show(cancel))\n\t\tCourse.waitFor(function() return done >= 1 end, 6)\n\t\ttask.wait(1.2)\n\t\tCourse.check(\"r3\", Course.equal(ticks, { 3, 2, 1 }) and done == 1, \"countdown(3, ...) should call onTick with 3, 2 and 1, a second apart, then onDone once. Got ticks \" .. Course.show(ticks) .. \" and onDone called \" .. done .. \" times.\")\n\tend)\nend\nif has(\"r4\", \"countdown\") then\n\tCourse.try(\"r4\", function()\n\t\tlocal ticks, done = {}, 0\n\t\tlocal good, cancel = Course.call(M.countdown, 5, function(n) table.insert(ticks, n) end, function() done += 1 end)\n\t\tif not good or type(cancel) ~= \"function\" then\n\t\t\tCourse.fail(\"r4\", \"countdown should return a cancel function.\")\n\t\t\treturn\n\t\tend\n\t\ttask.wait(1.5)\n\t\tcancel()\n\t\ttask.wait(5.5)\n\t\tCourse.check(\"r4\", done == 0 and #ticks <= 3 and #ticks >= 1, \"After cancelling a 5-second countdown 1.5 seconds in, it should stop: no more ticks and no onDone. Got ticks \" .. Course.show(ticks) .. \" and onDone called \" .. done .. \" times.\")\n\tend)\nend\n\nif has(\"r5\", \"makeGenerator\") then\n\tCourse.try(\"r5\", function()\n\t\tlocal good, nextItem = Course.call(M.makeGenerator, { \"Hill\", \"Vance\", \"Okafor\" })\n\t\tif not good or type(nextItem) ~= \"function\" then\n\t\t\tCourse.fail(\"r5\", \"makeGenerator should return a function, but \" .. (if good then \"returned \" .. Course.show(nextItem) else \"errored: \" .. tostring(nextItem)))\n\t\t\treturn\n\t\tend\n\t\tlocal got = {}\n\t\tfor i = 1, 5 do\n\t\t\tlocal fine, value = Course.call(nextItem)\n\t\t\tgot[i] = if fine then value else \"error: \" .. tostring(value)\n\t\tend\n\t\tCourse.check(\"r5\", got[1] == \"Hill\" and got[2] == \"Vance\" and got[3] == \"Okafor\" and got[4] == nil and got[5] == nil,\n\t\t\t\"Calling the generator for {\\\"Hill\\\", \\\"Vance\\\", \\\"Okafor\\\"} five times should give Hill, Vance, Okafor, nil, nil, but gave \" .. Course.show(got))\n\t\tlocal good2, other = Course.call(M.makeGenerator, { 1, 2 })\n\t\tif good2 and type(other) == \"function\" then\n\t\t\tCourse.check(\"r5\", other() == 1 and nextItem() == nil and other() == 2, \"Each generator should keep its own position.\")\n\t\tend\n\tend)\nend\n\nif has(\"r6\", \"withTimeout\") then\n\tCourse.try(\"r6\", function()\n\t\tlocal good, finished, result = Course.call(M.withTimeout, 2, function()\n\t\t\ttask.wait(0.5)\n\t\t\treturn \"pizza\"\n\t\tend)\n\t\tCourse.check(\"r6\", good and finished == true and result == \"pizza\", \"withTimeout(2, a job taking 0.5 seconds that returns \\\"pizza\\\") should return true, \\\"pizza\\\", but \" .. (if good then \"returned \" .. Course.show({ finished, result }) else \"errored: \" .. tostring(finished)))\n\t\tlocal good2, finished2, message = Course.call(M.withTimeout, 1, function()\n\t\t\ttask.wait(4)\n\t\t\treturn \"late\"\n\t\tend)\n\t\tCourse.check(\"r6\", good2 and finished2 == false and message == \"timed out\", \"withTimeout(1, a job taking 4 seconds) should give up and return false, \\\"timed out\\\", but \" .. (if good2 then \"returned \" .. Course.show({ finished2, message }) else \"errored: \" .. tostring(finished2)))\n\tend)\nend\n\nif has(\"r7\", \"runAll\") then\n\tCourse.try(\"r7\", function()\n\t\tlocal finishOrder = {}\n\t\tlocal function job(label, seconds)\n\t\t\treturn function()\n\t\t\t\ttask.wait(seconds)\n\t\t\t\ttable.insert(finishOrder, label)\n\t\t\t\treturn label\n\t\t\tend\n\t\tend\n\t\tlocal good, results = Course.call(M.runAll, { job(\"a\", 0.6), job(\"b\", 0.2), job(\"c\", 0.4) })\n\t\tCourse.check(\"r7\", good and Course.equal(results, { \"a\", \"b\", \"c\" }), \"runAll should return every job's result in the jobs' order, {\\\"a\\\", \\\"b\\\", \\\"c\\\"}, but \" .. (if good then \"returned \" .. Course.show(results) else \"errored: \" .. tostring(results)))\n\t\tCourse.check(\"r7\", Course.equal(finishOrder, { \"b\", \"c\", \"a\" }), \"runAll should run the jobs side by side, so the 0.2-second job finishes first. They finished in the order \" .. Course.show(finishOrder) .. \", which means they ran one after another.\")\n\t\tlocal good2, empty = Course.call(M.runAll, {})\n\t\tCourse.check(\"r7\", good2 and Course.equal(empty, {}), \"runAll with no jobs should return an empty table straight away.\")\n\tend)\nend\n",
+ "steps": [
+  "In the `NightShift` tab, make a module table with these four functions, and return it at the end. Use `task.spawn`, `task.wait` and the rest of the task library.",
+  "`countdown(seconds, onTick, onDone)` returns straight away, and counts in the background. For a countdown of 3, it calls `onTick(3)`, waits 1 second, calls `onTick(2)`, waits, calls `onTick(1)`, waits, then calls `onDone()`. It returns a cancel function, and after you call that, no more ticks or onDone happen.",
+  "`makeGenerator(list)` uses a coroutine and returns a function. For `{\"Hill\", \"Vance\"}`, calls give `\"Hill\"`, then `\"Vance\"`, then `nil` every time after, without erroring.",
+  "`withTimeout(seconds, job)` runs `job()` in a new thread and waits. If it finishes in time, return `true` and its result. If not, return `false, \"timed out\"` when the time is up.",
+  "`runAll(jobs)` starts every function in the list at the same time, waits until they've all finished, and returns their results in the same order as the list."
+ ]
+}

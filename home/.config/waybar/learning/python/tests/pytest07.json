@@ -1,0 +1,106 @@
+{
+ "id": "pytest07",
+ "chapter": 7,
+ "title": "The shop's tab system",
+ "runner": "program",
+ "timeout": 10,
+ "story": "Regular customers can run a tab at the shop and pay it off later. Write a `Tab` class for the till software. It has to refuse anything that would make the books wrong, and save and load tabs from a file at closing time.",
+ "requirements": [
+  {
+   "id": "r1",
+   "text": "`Tab(name)` makes a tab for that customer, with a `name` attribute and a `balance` attribute starting at 0."
+  },
+  {
+   "id": "r2",
+   "text": "`charge(amount)` adds to the balance, and `pay(amount)` takes it off. Both return the new balance."
+  },
+  {
+   "id": "r3",
+   "text": "`charge` and `pay` raise `ValueError` for amounts of 0 or less, and `pay` raises `ValueError` if it would take the balance below 0. The balance doesn't change when they refuse."
+  },
+  {
+   "id": "r4",
+   "text": "Printing a tab shows `<name> owes £<balance>`, with two decimal places, like `Ana owes £12.50`."
+  },
+  {
+   "id": "r5",
+   "text": "`save_tabs(tabs, path)` writes a list of tabs to a text file, one per line as `name,balance`. `load_tabs(path)` reads such a file back into a list of Tab objects, and returns an empty list if the file doesn't exist."
+  }
+ ],
+ "steps": [
+  "Write the class with `__init__`, `charge`, `pay` and `__str__`.",
+  "Check amounts at the top of `charge` and `pay`, and raise before changing anything.",
+  "Write `save_tabs` and `load_tabs` as ordinary functions below the class."
+ ],
+ "hints": [
+  "`raise ValueError(\"...\")` refuses an amount.",
+  "In `load_tabs`, split each line on the comma, and turn the balance back into a float.",
+  "Catch `FileNotFoundError` in `load_tabs`, or check that the file exists first."
+ ],
+ "static": [
+  {
+   "id": "r1",
+   "type": "uses",
+   "pattern": "class\\s+Tab\\b",
+   "fail": "Define a class called `Tab`."
+  },
+  {
+   "id": "r3",
+   "type": "uses",
+   "pattern": "raise\\s+ValueError",
+   "fail": "Raise `ValueError` to refuse bad amounts."
+  },
+  {
+   "id": "r4",
+   "type": "uses",
+   "pattern": "def\\s+__str__",
+   "fail": "Give the class a `__str__` method."
+  }
+ ],
+ "cases": [
+  {
+   "id": "r1",
+   "append": "t = Tab('Ana')\nprint(t.name, t.balance)",
+   "last": "Ana 0",
+   "fail": ""
+  },
+  {
+   "id": "r2",
+   "append": "t = Tab('Ana')\nprint(t.charge(10), t.charge(2.5), t.pay(5))",
+   "last": "10 12.5 7.5",
+   "fail": ""
+  },
+  {
+   "id": "r3",
+   "append": "t = Tab('Ana')\nt.charge(5)\nfor action in (lambda: t.charge(0), lambda: t.pay(-1), lambda: t.pay(6)):\n    try:\n        action()\n        print('allowed')\n    except ValueError:\n        print('refused')\nprint(t.balance)",
+   "lines": [
+    "refused",
+    "refused",
+    "refused",
+    "5"
+   ],
+   "label": "a zero charge, a negative payment and an overpayment",
+   "fail": ""
+  },
+  {
+   "id": "r4",
+   "append": "t = Tab('Ben')\nt.charge(12.5)\nprint(t)\nprint(f'{Tab(\"Cy\")}')",
+   "lines": [
+    "Ben owes £12.50",
+    "Cy owes £0.00"
+   ],
+   "fail": ""
+  },
+  {
+   "id": "r5",
+   "append": "a = Tab('Ana'); a.charge(3.25)\nb = Tab('Ben')\nsave_tabs([a, b], 'tabs.txt')\nprint(open('tabs.txt').read().strip().splitlines())\nloaded = load_tabs('tabs.txt')\nprint([str(t) for t in loaded])\nprint(load_tabs('missing.txt'))",
+   "lines": [
+    "['Ana,3.25', 'Ben,0']",
+    "['Ana owes £3.25', 'Ben owes £0.00']",
+    "[]"
+   ],
+   "fail": "",
+   "label": "saving two tabs, loading them, and loading a missing file"
+  }
+ ]
+}

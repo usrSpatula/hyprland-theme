@@ -1,0 +1,319 @@
+{
+ "chapter": "ch03",
+ "lessons": [
+  {
+   "id": "ch03-l1",
+   "title": "if statements",
+   "summary": "Running code only when a condition is true, and choosing between several paths with else and elseif.",
+   "minutes": 10,
+   "sections": [
+    {
+     "heading": "Making a decision",
+     "body": "So far every line of your scripts has run, top to bottom. An `if` statement changes that: it runs a block of code only when a **condition** is true. You write `if`, the condition, `then`, the lines to run, and `end`.\n\nThe condition is usually a comparison, which gives `true` or `false`, but it can be any value. The lines between `then` and `end` are the **block**. Indent them, so you can see at a glance which lines belong to the decision.",
+     "example": {
+      "caption": "A late delivery",
+      "code": "local minutesLate = 20\nif minutesLate > 15 then\n\tprint(\"Apologise to the customer\")\nend\nprint(\"Delivery finished\")",
+      "explain": "Both lines print here. If minutesLate were 5, only `Delivery finished` would print, because the block would be skipped."
+     }
+    },
+    {
+     "heading": "else",
+     "body": "Add `else` when you want something to happen in the other case too. Exactly one of the two blocks runs: the first when the condition is true, the one after `else` when it isn't. There's still only one `end`, closing the whole statement.\n\nThink of `if` with `else` as a fork in the road. The code always goes down one branch, then both branches meet again after `end`."
+    },
+    {
+     "heading": "elseif for several choices",
+     "body": "When there are more than two possibilities, chain them with `elseif`. Luau checks each condition **in order**, runs the block of the first one that's true, and skips all the rest, even if later conditions are true as well. An `else` at the end catches everything that didn't match.\n\nBecause only the first match runs, order matters. Put the most specific or most extreme case first. If you check \"more than 0 minutes late\" before \"more than 30 minutes late\", the second check can never run, because anything over 30 already matched the first.",
+     "example": {
+      "caption": "Grading a tip",
+      "code": "local tip = 7\nif tip >= 10 then\n\tprint(\"Generous\")\nelseif tip >= 5 then\n\tprint(\"Fair\")\nelse\n\tprint(\"Small\")\nend",
+      "explain": "Prints `Fair`. The first check fails, the second matches, and the else is skipped."
+     }
+    },
+    {
+     "heading": "Nesting",
+     "body": "An `if` can sit inside another `if`'s block. That's called **nesting**, and it's how you ask a follow-up question only when the first answer was yes. Each `if` needs its own `end`, which is why consistent indentation matters so much: it shows which `end` closes which `if`.\n\nDeep nesting gets hard to follow quickly. Two levels is usually fine. If you find yourself four levels deep, there's normally a cleaner way to write it, using `and` (next lesson) or by returning early from a function (chapter 5)."
+    }
+   ],
+   "key_points": [
+    "`if condition then ... end` runs the block only when the condition is truthy.",
+    "With `else`, exactly one of the two blocks runs.",
+    "`elseif` conditions are checked in order, and only the first match runs.",
+    "Each `if` statement needs exactly one `end`."
+   ],
+   "mistakes": [
+    "Writing `elseif` as `else if`, which starts a new nested if that needs its own `end`.",
+    "Putting a broad condition before a narrower one, so the narrow case never runs.",
+    "Forgetting `then` or `end`, which causes a syntax error."
+   ],
+   "try_it": "Store a time of night as an hour from 0 to 23. Print `Quiet` before 21, `Spooky` from 21 to 23, and test a few hours by changing the variable. Then add an elseif for midnight (hour 0) that prints something worse.",
+   "quiz": [
+    {
+     "question": "With `local n = 50`, what does this print? `if n > 10 then print(\"a\") elseif n > 40 then print(\"b\") else print(\"c\") end`",
+     "choices": [
+      "`a`",
+      "`b`",
+      "`a` then `b`",
+      "`c`"
+     ],
+     "answer": 0,
+     "explain": "The first true condition wins and the rest are skipped, even though n > 40 is also true."
+    },
+    {
+     "question": "How many `end`s does an if statement with two elseifs and an else need?",
+     "choices": [
+      "Four",
+      "One",
+      "Three",
+      "Two"
+     ],
+     "answer": 1,
+     "explain": "The whole if/elseif/else chain is one statement, closed by one end."
+    },
+    {
+     "question": "What's wrong with checking `minutes > 0` before `minutes > 30` in an elseif chain?",
+     "choices": [
+      "Nothing, the order doesn't matter",
+      "It's a syntax error",
+      "The `> 30` branch can never run",
+      "Both branches will run"
+     ],
+     "answer": 2,
+     "explain": "Anything over 30 is also over 0, so it always matches the first branch."
+    }
+   ]
+  },
+  {
+   "id": "ch03-l2",
+   "title": "and, or, not, and truthiness",
+   "summary": "Combining conditions, the two values Luau treats as false, and why and and or can return things other than booleans.",
+   "minutes": 11,
+   "sections": [
+    {
+     "heading": "Combining conditions",
+     "body": "`and` is true only when both sides are true. `or` is true when at least one side is. `not` flips a value: `not true` is `false`. With these you can say things like \"late **and** no tip\" or \"raining **or** after midnight\" in one condition.\n\nA common use is checking a range: a number is between 10 and 20 when it's at least 10 **and** at most 20. You need both comparisons, because Luau can't read a mathematical shorthand like `10 <= x <= 20`; that actually compares a boolean with 20 and errors.",
+     "example": {
+      "caption": "Two conditions together",
+      "code": "local minutesLate = 25\nlocal tip = 0\nif minutesLate > 15 and tip == 0 then\n\tprint(\"Offer a refund\")\nend",
+      "explain": "Both parts are true, so the refund line prints."
+     }
+    },
+    {
+     "heading": "Truthiness",
+     "body": "A condition doesn't have to be a boolean. Luau treats exactly two values as false: `false` and `nil`. **Everything else is truthy**, including `0`, negative numbers and the empty string. So writing `if customer then` means \"if customer has a value at all\".\n\nThis is one of the most important facts in Luau, and it differs from many other languages where zero counts as false. If you want to check for zero, say so with `== 0`."
+    },
+    {
+     "heading": "Short-circuiting",
+     "body": "Luau stops working out `and` and `or` as soon as it knows the answer. With `and`, if the left side is falsy the whole thing is false, so the right side never runs. With `or`, if the left side is truthy, the right side never runs. This is called **short-circuiting**.\n\nIt lets you guard a risky check behind a safe one: `customer and customer.name == \"Mrs Hill\"` only looks inside `customer` if it exists. You'll use this pattern all the time once you work with tables and instances."
+    },
+    {
+     "heading": "and and or return values",
+     "body": "Here's the subtle part: `and` and `or` don't always return `true` or `false`. `or` returns the first truthy value it finds, or the last value if none are truthy. `and` returns the first falsy value, or the last value if all are truthy.\n\nThat makes `or` a neat way to supply a default: `name or \"Guest\"` gives the name when there is one and `\"Guest\"` when it's `nil`. Watch precedence with `not`, which applies before comparisons. Write `not (a == b)` with brackets, or better, `a ~= b`. Without the brackets, `not a == b` compares the flipped value of `a` with `b`.",
+     "example": {
+      "caption": "A default value with or",
+      "code": "local nickname = nil\nlocal shown = nickname or \"Driver\"\nprint(shown)",
+      "explain": "Prints `Driver`, because nickname is nil, so or moves on to its right side."
+     }
+    }
+   ],
+   "key_points": [
+    "`and` needs both sides truthy, `or` needs at least one, `not` flips.",
+    "Only `false` and `nil` are falsy. `0` and the empty string are truthy.",
+    "`and` and `or` stop early, so the right side may never run.",
+    "`or` returns a value, which makes `x or default` a handy fallback."
+   ],
+   "mistakes": [
+    "Writing `if count then` expecting it to be false when count is `0`.",
+    "Writing `10 <= x <= 20`, which errors. Use two comparisons joined by `and`.",
+    "Writing `not a == b` when you meant `a ~= b`."
+   ],
+   "try_it": "Make variables for whether it's raining and whether it's after midnight, then print a warning when either is true and a stronger warning when both are. Then print the result of `nil or \"default\"`, `0 or \"default\"` and `false and \"x\"`.",
+   "quiz": [
+    {
+     "question": "What does `if 0 then print(\"yes\") else print(\"no\") end` print?",
+     "choices": [
+      "`no`",
+      "`yes`",
+      "An error",
+      "Nothing"
+     ],
+     "answer": 1,
+     "explain": "0 is truthy in Luau. Only false and nil are falsy."
+    },
+    {
+     "question": "What is `nil or \"pepperoni\"`?",
+     "choices": [
+      "`nil`",
+      "`true`",
+      "`false`",
+      "`\"pepperoni\"`"
+     ],
+     "answer": 3,
+     "explain": "or returns the first truthy value, and nil isn't truthy."
+    },
+    {
+     "question": "How do you check that `x` is between 1 and 9, including both?",
+     "choices": [
+      "`x >= 1 and x <= 9`",
+      "`1 <= x <= 9`",
+      "`x >= 1 or x <= 9`",
+      "`x in 1, 9`"
+     ],
+     "answer": 0,
+     "explain": "You need two comparisons joined by and. The or version is true for every number."
+    }
+   ]
+  },
+  {
+   "id": "ch03-l3",
+   "title": "Choosing values with if-expressions",
+   "summary": "Luau's if-then-else expression, which picks a value instead of running a block.",
+   "minutes": 8,
+   "sections": [
+    {
+     "heading": "Statements and expressions",
+     "body": "An `if` **statement** runs one block or another. Often, though, you don't want to run different code, you just want a different **value**: \"the greeting is Good evening if it's after 6, otherwise Hello\". Writing a whole if statement to set one variable is clumsy, so Luau has an **if-expression**.\n\nIt looks like an if statement squeezed onto one line, with no `end`: `if` condition `then` a value `else` another value. The whole thing produces a value you can store, print or pass along."
+    },
+    {
+     "heading": "Writing one",
+     "body": "An if-expression **must** have an `else`, because it always has to produce something. You can add `elseif` parts in the middle for more choices, and they're checked in order just like the statement version.\n\nOnly the chosen branch is worked out. The other values are never evaluated, so a branch that would error, like dividing by a missing number, is safe as long as it isn't chosen.\n\nYou can put an if-expression anywhere a value can go: on the right of an equals sign, inside a print, as part of a string you're joining, or after `return` once you've learnt functions. When it sits inside a longer expression, wrap it in brackets so it's obvious where it ends.",
+     "example": {
+      "caption": "Picking a word",
+      "code": "local slices = 1\nlocal word = if slices == 1 then \"slice\" else \"slices\"\nprint(slices .. \" \" .. word)",
+      "explain": "Prints `1 slice`. Change slices to 3 and it prints `3 slices`."
+     }
+    },
+    {
+     "heading": "The old and/or trick",
+     "body": "Before if-expressions existed, Lua programmers wrote `condition and a or b` to pick between two values, and you'll see it in older tutorials. It works most of the time, but it has a trap: if `a` is `false` or `nil`, the `and` part is falsy, so you get `b` even when the condition was true.\n\nThe if-expression has no such trap, and it reads more clearly. Prefer it in new code, and recognise the old trick when you meet it."
+    },
+    {
+     "heading": "When to use which",
+     "body": "Use an if-expression when you're choosing a value, and an if statement when you're choosing what to **do**. If each branch needs several lines, or does different jobs, a statement is clearer. If an if-expression grows several `elseif` parts, consider whether a statement or, later, a lookup table would read better.\n\nAs always, the goal is code that someone can understand in one read, including you in a month's time."
+    }
+   ],
+   "key_points": [
+    "`if cond then a else b` is an expression that produces a value.",
+    "The `else` part is required, and `elseif` parts are allowed.",
+    "Only the chosen branch is evaluated.",
+    "Prefer it to the old `cond and a or b` trick, which fails when `a` is falsy."
+   ],
+   "mistakes": [
+    "Leaving out the `else`, which is a syntax error in an expression.",
+    "Adding an `end` to an if-expression.",
+    "Using `cond and false or true`, which always gives `true`."
+   ],
+   "try_it": "Write a line that sets a variable to `\"open\"` or `\"closed\"` depending on whether an hour variable is between 17 and 23, and print it. Then rewrite it as an if statement and compare which reads better.",
+   "quiz": [
+    {
+     "question": "What does `local s = if 3 > 5 then \"big\" else \"small\"` store in `s`?",
+     "choices": [
+      "`\"big\"`",
+      "`false`",
+      "`\"small\"`",
+      "`nil`"
+     ],
+     "answer": 2,
+     "explain": "3 > 5 is false, so the else value is chosen."
+    },
+    {
+     "question": "Which part can an if-expression NOT leave out?",
+     "choices": [
+      "`else`",
+      "`elseif`",
+      "A second value",
+      "Brackets"
+     ],
+     "answer": 0,
+     "explain": "An expression must always produce a value, so else is required."
+    },
+    {
+     "question": "With `local hidden = true`, what is `hidden and false or true`?",
+     "choices": [
+      "`false`",
+      "`nil`",
+      "An error",
+      "`true`"
+     ],
+     "answer": 3,
+     "explain": "hidden and false is false, so or moves to true. That's the trap in the old trick."
+    }
+   ]
+  },
+  {
+   "id": "ch03-l4",
+   "title": "Writing clear conditions",
+   "summary": "Good boolean names, ordering checks, simplifying logic, and avoiding the classic condition bugs.",
+   "minutes": 9,
+   "sections": [
+    {
+     "heading": "Name your conditions",
+     "body": "A complicated condition is easier to read if you give parts of it names. Instead of one long line mixing minutes, tips and times, store pieces in boolean variables like `isLate`, `paidNothing` or `isNight`, then combine them. The condition then reads like a sentence.\n\nIt also makes bugs easier to find, because you can print each named piece and see which one isn't what you expected.",
+     "example": {
+      "caption": "Conditions with names",
+      "code": "local minutesLate, tip = 40, 2\nlocal isVeryLate = minutesLate > 30\nlocal paidLittle = tip < 3\nif isVeryLate and paidLittle then\n\tprint(\"Expect an angry review\")\nend",
+      "explain": "Both named conditions are true, so the warning prints."
+     }
+    },
+    {
+     "heading": "Don't compare with true",
+     "body": "Writing `if isLate == true then` works, but it's longer than `if isLate then` and says nothing more. Worse, `== true` is false for truthy values that aren't exactly `true`, which can hide bugs. Likewise, prefer `if not isLate then` to `== false`.\n\nThe exception is when `nil` and `false` mean different things to you. Then comparing exactly is correct, and a short comment saying why helps the next reader."
+    },
+    {
+     "heading": "Flipping conditions",
+     "body": "Sometimes the opposite of a condition is easier to work with. Two rules help: \"not (A and B)\" is the same as \"not A or not B\", and \"not (A or B)\" is the same as \"not A and not B\". So \"it's not true that it's late and unpaid\" means \"it's on time, or it's paid\".\n\nUse these to remove confusing `not`s around brackets. A condition with fewer `not`s is almost always easier to read."
+    },
+    {
+     "heading": "Test the edges",
+     "body": "Most condition bugs live at the boundaries. Is \"over 15 minutes\" `> 15` or `>= 15`? What happens at exactly 15? Decide on purpose, write it down in the code with the right operator, and test the exact boundary value, one below and one above.\n\nThis habit matters for the tests in this course. The checker tries edge values on purpose, because an off-by-one mistake is the most common bug there is.\n\nA quick way to do this without changing your script each time is to put the values you're testing in variables at the top, run, change them, and run again. In chapter 5 you'll wrap logic in functions, and testing becomes even easier: call the function with each edge value and print what comes back."
+    }
+   ],
+   "key_points": [
+    "Store parts of complex conditions in well-named boolean variables.",
+    "Write `if isLate then`, not `if isLate == true then`.",
+    "not (A and B) equals not A or not B, and the same swap works for or.",
+    "Decide and test boundaries: one below, exactly on, and one above."
+   ],
+   "mistakes": [
+    "Mixing up `>` and `>=` at a boundary.",
+    "Stacking several `not`s until the logic is unreadable.",
+    "Only testing values far from the boundary, where every version works."
+   ],
+   "try_it": "Write a condition for \"a customer complains if the pizza is more than 20 minutes late or colder than 50 degrees, unless they're a regular\". Give each part a name, then test it with values right on each boundary.",
+   "quiz": [
+    {
+     "question": "\"Deliveries over 10 get a bonus.\" Which condition matches exactly?",
+     "choices": [
+      "`deliveries >= 10`",
+      "`deliveries > 10`",
+      "`deliveries == 10`",
+      "`deliveries ~= 10`"
+     ],
+     "answer": 1,
+     "explain": "Over 10 means 11 or more, so 10 itself doesn't qualify."
+    },
+    {
+     "question": "Which means the same as `not (isLate or isCold)`?",
+     "choices": [
+      "`not isLate or not isCold`",
+      "`isLate and isCold`",
+      "`not isLate and not isCold`",
+      "`not isLate or isCold`"
+     ],
+     "answer": 2,
+     "explain": "Neither late nor cold means not late, and not cold."
+    },
+    {
+     "question": "Why is `if isLate then` better than `if isLate == true then`?",
+     "choices": [
+      "It's shorter and works for any truthy value",
+      "It runs faster in every case",
+      "The second one is a syntax error",
+      "There's no difference at all"
+     ],
+     "answer": 0,
+     "explain": "It says the same thing more simply, and doesn't fail for truthy values that aren't exactly true."
+    }
+   ]
+  }
+ ]
+}

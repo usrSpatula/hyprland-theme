@@ -1,0 +1,325 @@
+{
+ "chapter": "py02",
+ "lessons": [
+  {
+   "id": "py02-l1",
+   "title": "Variables",
+   "summary": "Naming values, changing them, and how assignment really works.",
+   "minutes": 9,
+   "sections": [
+    {
+     "heading": "A name for a value",
+     "body": "A **variable** is a name that refers to a value. You create one by **assignment**: a name, an equals sign, then a value. From then on, using the name gives you the value.\n\nRead `=` as \"becomes\", not \"equals\". `slices = 48` means \"slices becomes 48\". Python works out the right-hand side first, then attaches the name on the left to the result. That's why `count = count + 1` makes sense: work out `count + 1` using the old value, then make `count` refer to the new one.",
+     "example": {
+      "code": "orders = 3\nprint(orders)\norders = orders + 2\nprint(orders)",
+      "explain": "This prints `3`, then `5`."
+     }
+    },
+    {
+     "heading": "Naming rules and conventions",
+     "body": "Names can use letters, digits and underscores, but can't start with a digit, and can't be one of Python's keywords like `if`, `for` or `class`. Capitals matter: `Total` and `total` are different names.\n\nThe Python convention is **snake_case**: lowercase words joined by underscores, like `price_per_slice`. Choose names that describe the value. `p` is quick to type and slow to understand; `price` is the opposite, and code is read far more often than it's written."
+    },
+    {
+     "heading": "Shortcuts you'll see everywhere",
+     "body": "**Augmented assignment** combines an operation with assignment: `score += 10` means `score = score + 10`. There's `-=`, `*=`, `/=` and others.\n\n**Multiple assignment** sets several names at once: `x, y = 3, 4`. It's also the neat way to swap two values: `a, b = b, a`.",
+     "example": {
+      "code": "tips = 5\ntips += 3\nfirst, second = \"Ana\", \"Ben\"\nfirst, second = second, first\nprint(tips, first, second)",
+      "explain": "This prints `8 Ben Ana`."
+     }
+    }
+   ],
+   "key_points": [
+    "`name = value` makes a name refer to a value. Read `=` as \"becomes\".",
+    "The right side is worked out first, so `x = x + 1` uses the old `x`.",
+    "Use descriptive snake_case names. Capitals matter.",
+    "`+=` and friends update a variable; `a, b = b, a` swaps."
+   ],
+   "mistakes": [
+    "Using a variable before it's been assigned, which is a NameError.",
+    "Confusing `=` (assign) with `==` (compare), which you'll meet in chapter 3.",
+    "Names like `x1` and `temp2` that don't say what they hold."
+   ],
+   "try_it": "Make variables for your name, your age and a favourite number. Print a sentence with all three, add 1 to the age with `+=`, and print again. Swap two variables with one line.",
+   "quiz": [
+    {
+     "question": "After `a = 4` then `a = a * 3`, what's `a`?",
+     "choices": [
+      "`4`",
+      "`7`",
+      "`12`",
+      "`a * 3`"
+     ],
+     "answer": 2,
+     "explain": "The right side uses the old value: 4 * 3 is 12, which becomes the new value of a."
+    },
+    {
+     "question": "Which is a valid Python variable name?",
+     "choices": [
+      "`2nd_place`",
+      "`second-place`",
+      "`second_place`",
+      "`class`"
+     ],
+     "answer": 2,
+     "explain": "Names can't start with a digit, can't contain dashes, and can't be keywords like class."
+    },
+    {
+     "question": "What does `x, y = y, x` do?",
+     "choices": [
+      "Copies x into y",
+      "Swaps the values of x and y",
+      "Raises an error",
+      "Makes both equal to x"
+     ],
+     "answer": 1,
+     "explain": "The right side is built first from the old values, then unpacked into the names in the new order."
+    }
+   ]
+  },
+  {
+   "id": "py02-l2",
+   "title": "Numbers and maths",
+   "summary": "Whole numbers and decimals, every operator, rounding, and why 0.1 + 0.2 is odd.",
+   "minutes": 10,
+   "sections": [
+    {
+     "heading": "int and float",
+     "body": "Python has two everyday kinds of number. An **int** is a whole number like `7` or `-120`, and it can be as large as you like. A **float** is a number with a decimal point like `2.5` or `9.99`.\n\nMixing them gives a float: `3 + 0.5` is `3.5`. Ordinary division `/` **always** gives a float, even when it divides exactly: `10 / 2` is `5.0`."
+    },
+    {
+     "heading": "The operators",
+     "body": "These work like you'd expect, with a few Python extras:",
+     "example": {
+      "code": "pizzas = 17\nper_box = 5\nprint(pizzas // per_box, \"full boxes\")\nprint(pizzas % per_box, \"left over\")\nprint(2 ** 8)",
+      "explain": "This prints `3 full boxes`, `2 left over` and `256`."
+     },
+     "bullets": [
+      "`+` add, `-` subtract, `*` multiply, `/` divide (always a float).",
+      "`//` **floor division**: divides and rounds down to a whole number. `17 // 5` is `3`.",
+      "`%` **remainder** (modulo): what's left over. `17 % 5` is `2`. Great for \"every third\" and \"is it even\" checks.",
+      "`**` power: `2 ** 10` is `1024`.",
+      "Brackets come first, then `**`, then `* / // %`, then `+ -`, just like maths."
+     ]
+    },
+    {
+     "heading": "Rounding and float surprises",
+     "body": "`round(x)` rounds to the nearest whole number, and `round(x, 2)` to two decimal places. `int(x)` chops off the decimal part (towards zero), which isn't the same as rounding: `int(2.9)` is `2`.\n\nFloats are stored in binary, which can't represent most decimals exactly, so `0.1 + 0.2` gives `0.30000000000000004`. It's not a Python bug; every language does it. For money, either round when you display a value, or store amounts in pennies as ints.",
+     "example": {
+      "code": "print(0.1 + 0.2)\nprint(round(0.1 + 0.2, 2))\nprint(int(9.99), round(9.99))",
+      "explain": "Prints `0.30000000000000004`, then `0.3`, then `9 10`."
+     }
+    }
+   ],
+   "key_points": [
+    "`int` is whole, `float` has a decimal point. `/` always gives a float.",
+    "`//` divides and rounds down; `%` gives the remainder.",
+    "`round(x, 2)` rounds to two places; `int(x)` just chops.",
+    "Floats can be slightly off. Round for display, or use whole pennies."
+   ],
+   "mistakes": [
+    "Expecting `7 / 2` to be `3`. That's `7 // 2`.",
+    "Using `int()` to round, which only chops.",
+    "Comparing floats exactly, like `0.1 + 0.2 == 0.3`, which is False."
+   ],
+   "try_it": "In the prompt, work out how many weeks and days are in 100 days using `//` and `%`. Check whether 2026 is even with `%`. Print `0.1 * 3` and then round it.",
+   "quiz": [
+    {
+     "question": "What's `17 // 4`?",
+     "choices": [
+      "`4.25`",
+      "`4`",
+      "`1`",
+      "`5`"
+     ],
+     "answer": 1,
+     "explain": "Floor division rounds down to the whole number 4."
+    },
+    {
+     "question": "What's `17 % 4`?",
+     "choices": [
+      "`4`",
+      "`1`",
+      "`0.25`",
+      "`13`"
+     ],
+     "answer": 1,
+     "explain": "4 goes into 17 four times (16) with 1 left over."
+    },
+    {
+     "question": "What does `10 / 5` give?",
+     "choices": [
+      "`2`",
+      "`2.0`",
+      "`\"2\"`",
+      "An error"
+     ],
+     "answer": 1,
+     "explain": "Ordinary division always gives a float, even when it divides exactly."
+    }
+   ]
+  },
+  {
+   "id": "py02-l3",
+   "title": "Working with strings",
+   "summary": "f-strings, joining, length, indexing, slicing and the string methods you'll use most.",
+   "minutes": 12,
+   "sections": [
+    {
+     "heading": "f-strings: the best way to build text",
+     "body": "Put an `f` before the opening quote and you can drop values straight into a string with curly brackets. Anything inside `{}` is worked out and turned into text. This is called an **f-string**, and it's how most Python programmers build messages.\n\nYou can add a **format** after a colon inside the brackets. `{price:.2f}` shows a number with exactly two decimal places, which is perfect for money. `{count:>5}` right-aligns in five spaces.",
+     "example": {
+      "code": "name = \"Mia\"\npizzas = 3\nprice = 8.5\nprint(f\"{name} ordered {pizzas} pizzas\")\nprint(f\"Total: £{pizzas * price:.2f}\")",
+      "explain": "Prints `Mia ordered 3 pizzas` and `Total: £25.50`."
+     }
+    },
+    {
+     "heading": "Joining, repeating and measuring",
+     "body": "`+` joins two strings into one, and `*` repeats a string: `\"-\" * 10` is ten dashes. You can only join strings to strings: `\"Age: \" + 12` is a TypeError. Use an f-string, or `str(12)` to turn the number into text first.\n\n`len(text)` gives the number of characters, spaces included."
+    },
+    {
+     "heading": "Indexing and slicing",
+     "body": "Each character has a position called an **index**, counting from **0**. `word[0]` is the first character and `word[-1]` the last; negative indexes count back from the end.\n\nA **slice** takes a piece: `word[start:stop]` goes from `start` up to **but not including** `stop`. Leave either out to go from the beginning or to the end. `word[:3]` is the first three characters and `word[-3:]` the last three.",
+     "example": {
+      "code": "word = \"pepperoni\"\nprint(word[0], word[-1])\nprint(word[:6])\nprint(word[6:])\nprint(len(word))",
+      "explain": "Prints `p i`, then `pepper`, then `oni`, then `9`."
+     }
+    },
+    {
+     "heading": "String methods",
+     "body": "A **method** is a function that belongs to a value, used with a dot. Strings have dozens. These are the ones you'll use constantly. None of them change the original string (strings can't be changed); they **return a new one**, so assign the result if you want to keep it.",
+     "bullets": [
+      "`.upper()` / `.lower()`: change case.",
+      "`.strip()`: remove spaces and new lines from both ends. Essential for cleaning input.",
+      "`.replace(old, new)`: swap every `old` for `new`.",
+      "`.split()`: break into a list of words (more on lists in chapter 6). `.split(\",\")` splits on commas.",
+      "`.startswith(x)` / `.endswith(x)`: True or False.",
+      "`.count(x)` / `.find(x)`: how many times x appears / where it first appears (-1 if not)."
+     ]
+    }
+   ],
+   "key_points": [
+    "f-strings: `f\"Hi {name}\"`. `{value:.2f}` shows two decimal places.",
+    "Indexes start at 0; `[-1]` is the last character.",
+    "Slices `[start:stop]` stop *before* `stop`.",
+    "String methods return a new string; assign the result to keep it."
+   ],
+   "mistakes": [
+    "Forgetting the `f`, so `{name}` is printed literally.",
+    "Joining a number with `+`, which is a TypeError.",
+    "Calling `name.upper()` and expecting `name` itself to change."
+   ],
+   "try_it": "Store your full name in a variable. Print it in capitals, print its length, print your initials using indexing, and print a welcome message with an f-string. Try `\"a,b,c\".split(\",\")`.",
+   "quiz": [
+    {
+     "question": "What does `\"pizza\"[1:3]` give?",
+     "choices": [
+      "`\"pi\"`",
+      "`\"iz\"`",
+      "`\"izz\"`",
+      "`\"pizz\"`"
+     ],
+     "answer": 1,
+     "explain": "Index 1 is i, and the slice stops before index 3, so it's i and z."
+    },
+    {
+     "question": "What does `f\"{7 / 2:.2f}\"` give?",
+     "choices": [
+      "`\"3.5\"`",
+      "`\"3.50\"`",
+      "`\"3\"`",
+      "`\"7 / 2\"`"
+     ],
+     "answer": 1,
+     "explain": "`.2f` always shows exactly two decimal places."
+    },
+    {
+     "question": "`s = \" hi \"` then `s.strip()` then `print(s)`. What's printed?",
+     "choices": [
+      "`hi`",
+      "` hi ` (with the spaces)",
+      "An error",
+      "Nothing"
+     ],
+     "answer": 1,
+     "explain": "strip returns a new string, but it was never assigned, so s still has its spaces."
+    }
+   ]
+  },
+  {
+   "id": "py02-l4",
+   "title": "Types, conversion and input",
+   "summary": "bool and None, checking types, converting between them, and reading what the user types.",
+   "minutes": 11,
+   "sections": [
+    {
+     "heading": "bool and None",
+     "body": "A **bool** is either `True` or `False` (capital first letters). You'll use them constantly from the next chapter, when your programs start making decisions.\n\n`None` is Python's \"nothing here\" value. A variable can hold `None` to mean \"not set yet\" or \"no result\". It's not zero and it's not an empty string; it's its own thing."
+    },
+    {
+     "heading": "Every value has a type",
+     "body": "`type(x)` tells you what kind of value `x` is: `int`, `float`, `str` (string), `bool` or `NoneType`. Types decide what you can do: you can multiply ints, and you can `.upper()` strings, but not the other way round.\n\nYou **convert** between types by calling the type's name: `int(\"42\")` turns text into the number 42, `float(\"2.5\")` into 2.5, and `str(99)` turns a number into text. Converting text that isn't a number, like `int(\"pizza\")`, is a `ValueError`.",
+     "example": {
+      "code": "print(type(3), type(3.0), type(\"3\"))\nage_text = \"14\"\nage = int(age_text)\nprint(age + 1)",
+      "explain": "Prints `<class 'int'> <class 'float'> <class 'str'>`, then `15`."
+     }
+    },
+    {
+     "heading": "Reading input",
+     "body": "`input()` pauses the program, waits for the user to type a line and press Enter, and gives you that line **as a string**. If you pass a message, like `input(\"Name? \")`, it's shown first as a prompt.\n\nBecause input is always a string, convert it before doing maths: `int(input())`. It's also good practice to `.strip()` text input, in case of stray spaces.\n\nIn this course's tests, input comes from the test instead of a person, so **don't pass a prompt message** to `input()` in tests (it would end up in your output). Just write `input()`.",
+     "example": {
+      "code": "name = input().strip()\npizzas = int(input())\nprint(f\"{name} wants {pizzas * 8} slices\")",
+      "caption": "With the input lines `Sam` and `2`:",
+      "explain": "This prints `Sam wants 16 slices`."
+     }
+    }
+   ],
+   "key_points": [
+    "`True`, `False` and `None` are values too. None means \"nothing\".",
+    "`type(x)` shows a value's type; `int()`, `float()`, `str()` convert.",
+    "`input()` always returns a string. Convert before doing maths.",
+    "In tests, use plain `input()` with no prompt message."
+   ],
+   "mistakes": [
+    "Doing maths on `input()` without converting, so `\"2\" * 3` gives `\"222\"`.",
+    "Writing `true` or `none` in lowercase, which are NameErrors.",
+    "Converting text with spaces or letters to int, which is a ValueError."
+   ],
+   "try_it": "Write a script that asks for two numbers with `input()`, converts them, and prints their sum, difference and product. Then try typing a word instead of a number and read the error.",
+   "quiz": [
+    {
+     "question": "What type does `input()` give?",
+     "choices": [
+      "int",
+      "str",
+      "Whatever the user typed",
+      "float"
+     ],
+     "answer": 1,
+     "explain": "input always gives a string, even if the user typed digits."
+    },
+    {
+     "question": "What does `int(\"7\") + 3` give?",
+     "choices": [
+      "`\"73\"`",
+      "`10`",
+      "`\"10\"`",
+      "An error"
+     ],
+     "answer": 1,
+     "explain": "int(\"7\") is the number 7, and 7 + 3 is 10."
+    },
+    {
+     "question": "What does `\"7\" + \"3\"` give?",
+     "choices": [
+      "`10`",
+      "`\"73\"`",
+      "`\"10\"`",
+      "An error"
+     ],
+     "answer": 1,
+     "explain": "Adding two strings joins them, so it's the text 73."
+    }
+   ]
+  }
+ ]
+}

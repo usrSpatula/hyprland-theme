@@ -1,0 +1,97 @@
+{
+ "id": "test09",
+ "chapter": 9,
+ "title": "Ovens, money and something wrong",
+ "runner": "edit",
+ "timeout": 25,
+ "story": "The pizzeria is rewriting its software with proper classes. Ovens are objects that hold pizzas in order. Money is a value type that adds and compares like a number but prints like dollars. And there's the haunted oven in the back, which works like any other oven, except every third pizza you put in is never seen again.",
+ "create": [
+  "A Folder named `Test09` inside `ServerScriptService.Course`.",
+  "Three ModuleScripts inside it: `Oven`, `Money` and `HauntedOven`. Each returns its class table."
+ ],
+ "requirements": [
+  {
+   "id": "r1",
+   "text": "ModuleScripts named `Oven`, `Money` and `HauntedOven`."
+  },
+  {
+   "id": "r2",
+   "text": "`Oven.new(capacity)` makes an oven. `oven:add(name)` stores the pizza and returns `true`, or returns `false` if the oven is full. `oven:take()` removes and returns the pizza that has been in longest, or `nil` if empty. `oven:count()` and `oven:isFull()` report the state. `tostring(oven)` gives text like `\"Oven 2/4\"` (pizzas inside, then capacity)."
+  },
+  {
+   "id": "r3",
+   "text": "Each oven keeps its own pizzas, and the methods live in the `Oven` class (shared through a metatable), not inside each object."
+  },
+  {
+   "id": "r4",
+   "text": "`Money.new(cents)` makes an amount. `tostring` shows dollars with two decimals, like `\"$12.50\"`. Adding two amounts with `+` returns a new amount and changes neither."
+  },
+  {
+   "id": "r5",
+   "text": "Amounts compare by value: `==` is true for the same number of cents, and `<` and `<=` work."
+  },
+  {
+   "id": "r6",
+   "text": "`Money.new` raises an error containing `whole cents only` when given a number that isn't whole."
+  },
+  {
+   "id": "r7",
+   "text": "`HauntedOven` inherits from `Oven` and only overrides `add`: every third pizza added to a haunted oven vanishes. `add` still returns `true` for it, but it isn't stored. The usual full check still applies to the pizzas that stay."
+  },
+  {
+   "id": "r8",
+   "text": "`tostring` works on haunted ovens too, giving the same kind of text as a normal oven."
+  }
+ ],
+ "hints": [
+  "Start from the class pattern: a table whose __index is itself, a new function that calls setmetatable, and methods defined with a colon.",
+  "Money needs __tostring, __add, __eq, __lt and __le on its metatable. string.format helps with the dollars, and dividing the cents by 100 gives the dollar amount.",
+  "HauntedOven's own metatable falls back to Oven. Its add counts every call, and on every third one returns true without storing anything; otherwise it calls Oven's add with self. Then copy Oven's __tostring across."
+ ],
+ "static": [
+  {
+   "id": "r1",
+   "type": "exists",
+   "path": "ServerScriptService.Course.Test09.Oven",
+   "class": "ModuleScript",
+   "fail": "Create a ModuleScript named `Oven` inside the `Test09` folder."
+  },
+  {
+   "id": "r1",
+   "type": "exists",
+   "path": "ServerScriptService.Course.Test09.Money",
+   "class": "ModuleScript",
+   "fail": "Create a ModuleScript named `Money` inside the `Test09` folder."
+  },
+  {
+   "id": "r1",
+   "type": "exists",
+   "path": "ServerScriptService.Course.Test09.HauntedOven",
+   "class": "ModuleScript",
+   "fail": "Create a ModuleScript named `HauntedOven` inside the `Test09` folder."
+  },
+  {
+   "id": "r7",
+   "type": "uses",
+   "path": "ServerScriptService.Course.Test09.HauntedOven",
+   "pattern": "\\brequire\\s*\\(",
+   "fail": "HauntedOven should require Oven and inherit from it."
+  },
+  {
+   "id": "r7",
+   "type": "avoids",
+   "path": "ServerScriptService.Course.Test09.HauntedOven",
+   "pattern": "function\\s+\\w+\\s*[:.]\\s*(take|count|isFull)\\b",
+   "fail": "HauntedOven should inherit take, count and isFull from Oven, not define its own."
+  }
+ ],
+ "check": "local base = \"ServerScriptService.Course.Test09.\"\nlocal function call(fn, ...)\n\treturn Course.call(fn, ...)\nend\n\n-- Oven\nlocal Oven, ovenInfo = Course.load(base .. \"Oven\")\nlocal ovenOk = type(Oven) == \"table\" and type(Oven.new) == \"function\"\nCourse.check(\"r2\", ovenOk, \"Oven should return a class table with a new function, but returned \" .. Course.show(Oven) .. (if ovenInfo.error then \" (\" .. ovenInfo.error .. \")\" else \"\"))\nif ovenOk then\n\tCourse.try(\"r2\", function()\n\t\tlocal good, oven = call(Oven.new, 2)\n\t\tif not good or type(oven) ~= \"table\" then\n\t\t\tCourse.fail(\"r2\", \"Oven.new(2) should return an object, but \" .. (if good then \"returned \" .. Course.show(oven) else \"errored: \" .. tostring(oven)))\n\t\t\treturn\n\t\tend\n\t\tlocal adds = { oven:add(\"Margherita\"), oven:add(\"Pepperoni\"), oven:add(\"Hawaiian\") }\n\t\tCourse.check(\"r2\", Course.equal(adds, { true, true, false }), \"Adding three pizzas to a capacity-2 oven should return true, true, false, but returned \" .. Course.show(adds))\n\t\tCourse.check(\"r2\", oven:count() == 2 and oven:isFull() == true, \"After filling a capacity-2 oven, count() should be 2 and isFull() should be true.\")\n\t\tCourse.check(\"r2\", tostring(oven) == \"Oven 2/2\", \"tostring of a full capacity-2 oven should be \\\"Oven 2/2\\\", but was \" .. Course.show(tostring(oven)))\n\t\tlocal taken = { oven:take(), oven:take(), oven:take() }\n\t\tCourse.check(\"r2\", taken[1] == \"Margherita\" and taken[2] == \"Pepperoni\" and taken[3] == nil, \"take() should return pizzas in the order they went in, then nil when empty, but returned \" .. Course.show(taken))\n\t\tCourse.check(\"r2\", oven:count() == 0 and oven:isFull() == false and tostring(oven) == \"Oven 0/2\", \"After emptying it, count() should be 0, isFull() false, and tostring \\\"Oven 0/2\\\".\")\n\t\tlocal _, other = call(Oven.new, 3)\n\t\tother:add(\"Ghost Chilli\")\n\t\tCourse.check(\"r3\", oven:count() == 0 and other:count() == 1, \"Two ovens should keep separate pizzas, but adding to one changed the other.\")\n\t\tCourse.check(\"r3\", rawget(oven, \"add\") == nil and rawget(oven, \"take\") == nil and getmetatable(oven) == getmetatable(other), \"Methods should live in the Oven class and be shared through the metatable, not copied into every object.\")\n\tend)\nelse\n\tCourse.fail(\"r3\", \"Not checked: Oven.new is missing.\")\nend\n\n-- Money\nlocal Money, moneyInfo = Course.load(base .. \"Money\")\nlocal moneyOk = type(Money) == \"table\" and type(Money.new) == \"function\"\nCourse.check(\"r4\", moneyOk, \"Money should return a class table with a new function, but returned \" .. Course.show(Money) .. (if moneyInfo.error then \" (\" .. moneyInfo.error .. \")\" else \"\"))\nif moneyOk then\n\tCourse.try(\"r4\", function()\n\t\tlocal _, a = call(Money.new, 1250)\n\t\tlocal _, b = call(Money.new, 5)\n\t\tCourse.check(\"r4\", tostring(a) == \"$12.50\" and tostring(b) == \"$0.05\", \"tostring(Money.new(1250)) should be \\\"$12.50\\\" and tostring(Money.new(5)) \\\"$0.05\\\", but were \" .. Course.show(tostring(a)) .. \" and \" .. Course.show(tostring(b)))\n\t\tlocal good, sum = pcall(function() return a + b end)\n\t\tCourse.check(\"r4\", good and type(sum) == \"table\" and tostring(sum) == \"$12.55\" and getmetatable(sum) == getmetatable(a), \"Adding Money.new(1250) and Money.new(5) should give a new Money worth \\\"$12.55\\\", but \" .. (if good then \"gave \" .. Course.show(tostring(sum)) else \"errored: \" .. tostring(sum)))\n\t\tCourse.check(\"r4\", tostring(a) == \"$12.50\" and tostring(b) == \"$0.05\", \"Adding two amounts shouldn't change either of them.\")\n\t\tlocal _, c = call(Money.new, 100)\n\t\tlocal _, d = call(Money.new, 100)\n\t\tlocal _, e = call(Money.new, 99)\n\t\tCourse.check(\"r5\", c == d and not (c == e), \"Money.new(100) == Money.new(100) should be true, and Money.new(100) == Money.new(99) false.\")\n\t\tlocal okLess, less = pcall(function() return e < c and not (c < e) and e <= c and c >= d end)\n\t\tCourse.check(\"r5\", okLess and less == true, \"Money should support < and <= comparisons: 99 cents is less than 100 cents.\")\n\t\tlocal bad, message = call(Money.new, 1.5)\n\t\tCourse.check(\"r6\", not bad and string.find(tostring(message), \"whole cents only\", 1, true) ~= nil, \"Money.new(1.5) should raise an error containing \\\"whole cents only\\\", but \" .. (if bad then \"it returned normally\" else \"the error was \" .. Course.show(message)))\n\tend)\nelse\n\tCourse.fail(\"r5\", \"Not checked: Money.new is missing.\")\n\tCourse.fail(\"r6\", \"Not checked: Money.new is missing.\")\nend\n\n-- HauntedOven\nlocal Haunted, hauntedInfo = Course.load(base .. \"HauntedOven\")\nlocal hauntedOk = type(Haunted) == \"table\" and type(Haunted.new) == \"function\"\nCourse.check(\"r7\", hauntedOk, \"HauntedOven should return a class table with a new function, but returned \" .. Course.show(Haunted) .. (if hauntedInfo.error then \" (\" .. hauntedInfo.error .. \")\" else \"\"))\nif hauntedOk then\n\tCourse.try(\"r7\", function()\n\t\tlocal good, oven = call(Haunted.new, 5)\n\t\tif not good or type(oven) ~= \"table\" then\n\t\t\tCourse.fail(\"r7\", \"HauntedOven.new(5) should return an object, but \" .. (if good then \"returned \" .. Course.show(oven) else \"errored: \" .. tostring(oven)))\n\t\t\treturn\n\t\tend\n\t\tlocal adds = {}\n\t\tfor i = 1, 6 do\n\t\t\tadds[i] = oven:add(\"Pizza \" .. i)\n\t\tend\n\t\tCourse.check(\"r7\", Course.equal(adds, { true, true, true, true, true, true }) and oven:count() == 4, \"Adding 6 pizzas to a capacity-5 haunted oven should return true every time, with the 3rd and 6th vanishing, leaving count() at 4. Got returns \" .. Course.show(adds) .. \" and count \" .. Course.show(oven:count()))\n\t\tlocal first, second, third = oven:take(), oven:take(), oven:take()\n\t\tCourse.check(\"r7\", first == \"Pizza 1\" and second == \"Pizza 2\" and third == \"Pizza 4\", \"The pizzas left should come out as Pizza 1, Pizza 2, Pizza 4, but came out as \" .. Course.show({ first, second, third }))\n\t\tCourse.check(\"r8\", tostring(oven) == \"Oven 1/5\", \"tostring of a haunted oven holding 1 pizza with capacity 5 should be \\\"Oven 1/5\\\", but was \" .. Course.show(tostring(oven)) .. \". Remember metamethods aren't inherited through __index.\")\n\tend)\nelse\n\tCourse.fail(\"r8\", \"Not checked: HauntedOven.new is missing.\")\nend\n",
+ "steps": [
+  "**Oven tab:** a class. `Oven.new(2)` makes an oven that holds up to 2 pizzas.",
+  "`oven:add(\"Margherita\")` stores the pizza and returns `true`, or returns `false` if the oven is full. `oven:take()` removes and returns the pizza that went in first, or `nil` if it's empty. `oven:count()` gives how many are inside, and `oven:isFull()` gives `true` or `false`.",
+  "`tostring(oven)` gives text like `\"Oven 2/4\"`: pizzas inside, a slash, then the capacity. Use a `__tostring` metamethod. Put every method in the Oven class table, not inside each object.",
+  "**Money tab:** a class. `tostring(Money.new(1250))` gives `\"$12.50\"`. Adding two amounts with `+` gives a new amount and changes neither. `==` compares the cents, and `<` and `<=` work too. `Money.new(1.5)` raises an error containing `whole cents only`.",
+  "**HauntedOven tab:** require Oven and inherit from it. Only change `add`: every 3rd pizza ever added vanishes, which means `add` returns `true` but doesn't store it. Copy Oven's `__tostring` onto HauntedOven so `tostring` works on haunted ovens too."
+ ],
+ "example": "A haunted oven with capacity 5, after adding 6 pizzas:\nevery add returned true\ncount() is 4 (the 3rd and 6th vanished)"
+}

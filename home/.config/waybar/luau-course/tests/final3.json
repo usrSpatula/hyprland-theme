@@ -1,0 +1,66 @@
+{
+ "id": "final3",
+ "title": "The slip reader",
+ "runner": "edit",
+ "timeout": 25,
+ "story": "Final project 3. The night manager scribbles orders on paper slips, and someone has to type them in. Build the system that reads a slip, refuses ones that make no sense, prices them from the menu, and prints a neat receipt.\n\nA slip's first line is `Order 42 for Mrs Hill`, and each following line is an item like `2x pepperoni`. Prices are in whole cents.",
+ "create": [
+  "A Folder named `Final3` inside `ServerScriptService.Course`.",
+  "A ModuleScript named `Slips` inside it, returning a table of functions."
+ ],
+ "requirements": [
+  {
+   "id": "r1",
+   "text": "A ModuleScript named `Slips`."
+  },
+  {
+   "id": "r2",
+   "text": "It returns a table with `parseSlip`, `priceOrder` and `receipt`."
+  },
+  {
+   "id": "r3",
+   "text": "`parseSlip(text)` returns `{ number = 42, customer = \"Mrs Hill\", items = { { count = 2, name = \"pepperoni\" }, ... } }`. The words Order and for can be in any capitals, spaces around the customer and around each line are trimmed, blank lines are skipped, and item names are stored in lowercase."
+  },
+  {
+   "id": "r4",
+   "text": "For a slip that doesn't make sense (a bad first line, an empty customer, an item line not shaped like `2x name`, a count below 1, or no items at all) `parseSlip` returns `nil` and a short reason string, without erroring."
+  },
+  {
+   "id": "r5",
+   "text": "`priceOrder(order, menu)` returns the total in cents, using the `menu` table from item name to price in cents, and an array of the item names that aren't on the menu (in slip order), which don't count towards the total."
+  },
+  {
+   "id": "r6",
+   "text": "`receipt(order, menu)` returns an array of lines: `ORDER #0042 - Mrs Hill` (number padded to 4 digits), then one line per item like `2 x pepperoni      $25.00`, and finally `TOTAL              $41.50`. Item lines and the total are 25 characters wide, with the price right-aligned. Assume every item is on the menu."
+  }
+ ],
+ "hints": [
+  "Split the text into lines, trim each one, and skip empty ones. Match the first line with one anchored pattern and two captures, after lowering it to check the words. Keep the original capitals of the customer's name.",
+  "Each item line is a pattern with a number capture, an x, spaces, and the name. Return nil and a reason as soon as anything is wrong.",
+  "For the receipt, string.format can right-align with a width: work out the item text on the left, format the price as dollars, and pad the gap so each line is exactly 25 characters."
+ ],
+ "static": [
+  {
+   "id": "r1",
+   "type": "exists",
+   "path": "ServerScriptService.Course.Final3.Slips",
+   "class": "ModuleScript",
+   "fail": "Create a ModuleScript named `Slips` in the `Final3` folder."
+  },
+  {
+   "id": "r6",
+   "type": "uses",
+   "path": "ServerScriptService.Course.Final3.Slips",
+   "pattern": "string\\.format|:format\\s*\\(",
+   "fail": "Use string.format for the receipt lines."
+  }
+ ],
+ "check": "local Slips, info = Course.load(\"ServerScriptService.Course.Final3.Slips\")\nif type(Slips) ~= \"table\" then\n\tCourse.fail(\"r2\", \"Slips should return a table of functions, but returned \" .. Course.show(Slips) .. (if info.error then \" (\" .. info.error .. \")\" else \"\"))\n\tfor _, id in { \"r3\", \"r4\", \"r5\", \"r6\" } do Course.fail(id, \"Not checked: Slips didn't load.\") end\n\treturn\nend\nfor _, name in { \"parseSlip\", \"priceOrder\", \"receipt\" } do\n\tCourse.check(\"r2\", type(Slips[name]) == \"function\", \"Slips.\" .. name .. \" should be a function.\")\nend\nlocal MENU = { pepperoni = 1250, margherita = 1100, [\"garlic bread\"] = 600, soda = 350 }\nlocal slip = \"Order 42 for Mrs Hill\\n2x pepperoni\\n1x garlic bread\\n\\n3x soda\\n\"\nCourse.try(\"r3\", function()\n\tlocal good, order = Course.call(Slips.parseSlip, slip)\n\tCourse.check(\"r3\", good and Course.equal(order, { number = 42, customer = \"Mrs Hill\", items = { { count = 2, name = \"pepperoni\" }, { count = 1, name = \"garlic bread\" }, { count = 3, name = \"soda\" } } }),\n\t\t\"parseSlip should turn the sample slip into {number = 42, customer = \\\"Mrs Hill\\\", items = {{count = 2, name = \\\"pepperoni\\\"}, ...}}, skipping blank lines. Got \" .. Course.show(order))\n\tlocal good2, order2 = Course.call(Slips.parseSlip, \"order 7 for  Vance \\n  1x Soda  \")\n\tCourse.check(\"r3\", good2 and order2 and order2.number == 7 and order2.customer == \"Vance\" and Course.equal(order2.items, { { count = 1, name = \"soda\" } }),\n\t\t\"parseSlip should ignore capitals in the words Order and for, trim spaces around the customer and each line, and store item names in lowercase. Got \" .. Course.show(order2))\nend)\nCourse.try(\"r4\", function()\n\tfor _, bad in { \"\", \"Hello there\", \"Order x for Hill\\n1x soda\", \"Order 3 for \\n1x soda\", \"Order 3 for Hill\\n2 pepperoni\", \"Order 3 for Hill\\n0x soda\", \"Order 3 for Hill\" } do\n\t\tlocal good, result, reason = Course.call(Slips.parseSlip, bad)\n\t\tCourse.check(\"r4\", good and result == nil and type(reason) == \"string\" and reason ~= \"\", \"parseSlip(\" .. Course.show(bad) .. \") should return nil and a reason, but \" .. (if good then \"returned \" .. Course.show({ result, reason }) else \"errored: \" .. tostring(result)))\n\tend\nend)\nCourse.try(\"r5\", function()\n\tlocal _, order = Course.call(Slips.parseSlip, slip)\n\tlocal good, total, unknown = Course.call(Slips.priceOrder, order, MENU)\n\tCourse.check(\"r5\", good and total == 4150 and Course.equal(unknown, {}), \"priceOrder should total the sample order to 4150 cents with no unknown items, but returned \" .. Course.show({ total, unknown }))\n\tlocal _, odd = Course.call(Slips.parseSlip, \"Order 9 for Bo\\n2x ghost chilli\\n1x soda\\n1x olive\")\n\tlocal good2, total2, unknown2 = Course.call(Slips.priceOrder, odd, MENU)\n\tCourse.check(\"r5\", good2 and total2 == 350 and Course.equal(unknown2, { \"ghost chilli\", \"olive\" }), \"Items not on the menu don't count towards the total, and come back in a list in slip order: expected 350 and {\\\"ghost chilli\\\", \\\"olive\\\"}, got \" .. Course.show({ total2, unknown2 }))\nend)\nCourse.try(\"r6\", function()\n\tlocal _, order = Course.call(Slips.parseSlip, slip)\n\tlocal good, lines = Course.call(Slips.receipt, order, MENU)\n\tlocal wanted = { \"ORDER #0042 - Mrs Hill\", \"2 x pepperoni      $25.00\", \"1 x garlic bread    $6.00\", \"3 x soda           $10.50\", \"TOTAL              $41.50\" }\n\tCourse.check(\"r6\", good and Course.equal(lines, wanted), \"receipt should return these lines exactly: \" .. Course.show(wanted) .. \", but returned \" .. Course.show(lines))\nend)\n",
+ "steps": [
+  "In the `Slips` tab, make a module table with three functions, and return it at the end.",
+  "`parseSlip(text)` reads a slip like `\"Order 42 for Mrs Hill\\n2x pepperoni\\n1x garlic bread\"` and returns `{ number = 42, customer = \"Mrs Hill\", items = { { count = 2, name = \"pepperoni\" }, { count = 1, name = \"garlic bread\" } } }`. Skip blank lines and trim extra spaces. The words Order and for can have any capitals, and item names are stored in lowercase. If anything is wrong, such as a bad first line, no customer, a bad item line, a count below 1 or no items, return `nil` and a short reason.",
+  "`priceOrder(order, menu)` gets a menu like `{ pepperoni = 1250, soda = 350 }` in cents. Return the total in cents, and a list of item names that aren't on the menu (those don't count towards the total).",
+  "`receipt(order, menu)` returns a list of text lines: first `ORDER #0042 - Mrs Hill` (the number padded to 4 digits), then one line per item, then the total. Item and total lines are exactly 25 characters long, with the price at the right-hand end."
+ ],
+ "example": "ORDER #0042 - Mrs Hill\n2 x pepperoni      $25.00\n1 x garlic bread    $6.00\n3 x soda           $10.50\nTOTAL              $41.50"
+}

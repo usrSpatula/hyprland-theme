@@ -1,0 +1,77 @@
+{
+ "id": "test08",
+ "chapter": 8,
+ "title": "Kitchen tools",
+ "runner": "edit",
+ "timeout": 25,
+ "story": "The night kitchen runs on small, reusable tools: ticket counters for each oven, helpers that process whole lists of orders, a memory that saves the chef from redoing slow sums, and a division function that refuses nonsense loudly but can also be used safely.\n\nThe checker counts how often your functions really run, so the memory has to genuinely remember.",
+ "create": [
+  "A Folder named `Test08` inside `ServerScriptService.Course`.",
+  "A ModuleScript named `Kitchen` inside `Test08`, returning a table of functions."
+ ],
+ "requirements": [
+  {
+   "id": "r1",
+   "text": "A ModuleScript named `Kitchen`."
+  },
+  {
+   "id": "r2",
+   "text": "It returns a table with `makeCounter`, `map`, `filter`, `reduce`, `memoize`, `checkedDivide` and `safeDivide`."
+  },
+  {
+   "id": "r3",
+   "text": "`makeCounter(start, step)` returns a function. Its first call returns `start`, and each later call returns the previous value plus `step`. Counters are independent of each other."
+  },
+  {
+   "id": "r4",
+   "text": "`map(list, fn)` returns a new list of `fn(item)` for every item. `filter(list, fn)` returns a new list of the items where `fn(item)` is truthy. Neither changes the original list."
+  },
+  {
+   "id": "r5",
+   "text": "`reduce(list, fn, initial)` starts from `initial` and, for each item, sets the running value to `fn(runningValue, item)`, then returns it. An empty list returns `initial`."
+  },
+  {
+   "id": "r6",
+   "text": "`memoize(fn)` returns a function that gives the same answers as `fn` for a single argument, but only calls `fn` once for each different argument, remembering the rest. Each memoised function has its own memory."
+  },
+  {
+   "id": "r7",
+   "text": "`checkedDivide(a, b)` returns `a / b`. It raises an error containing `can't divide by zero` when `b` is 0, and one containing `numbers only` when either argument isn't a number."
+  },
+  {
+   "id": "r8",
+   "text": "`safeDivide(a, b)` never errors. It returns `true` and the result, or `false` and the error message, by calling `checkedDivide` with `pcall`."
+  }
+ ],
+ "hints": [
+  "makeCounter and memoize are factories: create a local inside them, and return a function that uses it.",
+  "For the counter, think carefully about what the very first call returns. It's the start value itself, not the start plus a step.",
+  "Check the types in checkedDivide before checking for zero. safeDivide is a single pcall, with checkedDivide and its arguments passed separately."
+ ],
+ "static": [
+  {
+   "id": "r1",
+   "type": "exists",
+   "path": "ServerScriptService.Course.Test08.Kitchen",
+   "class": "ModuleScript",
+   "fail": "Create a ModuleScript named `Kitchen` inside the `Test08` folder."
+  },
+  {
+   "id": "r8",
+   "type": "uses",
+   "path": "ServerScriptService.Course.Test08.Kitchen",
+   "pattern": "\\bpcall\\s*\\(",
+   "fail": "safeDivide should use pcall."
+  }
+ ],
+ "check": "local path = \"ServerScriptService.Course.Test08.Kitchen\"\nlocal K, info = Course.load(path)\nlocal ok = type(K) == \"table\"\nCourse.check(\"r2\", ok, \"Kitchen should return a table of functions, but it returned \" .. Course.show(K) .. (if info.error then \" (\" .. info.error .. \")\" else \"\"))\nlocal names = { \"makeCounter\", \"map\", \"filter\", \"reduce\", \"memoize\", \"checkedDivide\", \"safeDivide\" }\nif ok then\n\tfor _, name in names do\n\t\tCourse.check(\"r2\", type(K[name]) == \"function\", \"Kitchen.\" .. name .. \" should be a function, but it's \" .. Course.show(K[name]) .. \".\")\n\tend\nend\nlocal function has(id, name)\n\tif ok and type(K[name]) == \"function\" then\n\t\treturn true\n\tend\n\tCourse.fail(id, \"Not checked: Kitchen.\" .. name .. \" is missing.\")\n\treturn false\nend\n\nif has(\"r3\", \"makeCounter\") then\n\tCourse.try(\"r3\", function()\n\t\tlocal okA, a = Course.call(K.makeCounter, 10, 5)\n\t\tlocal okB, b = Course.call(K.makeCounter, 1, 1)\n\t\tif not (okA and okB and type(a) == \"function\" and type(b) == \"function\") then\n\t\t\tCourse.fail(\"r3\", \"makeCounter should return a function, but returned \" .. Course.show(a))\n\t\t\treturn\n\t\tend\n\t\tlocal seen = { a(), a(), b(), a(), b() }\n\t\tCourse.check(\"r3\", Course.equal(seen, { 10, 15, 1, 20, 2 }), \"Two counters made with makeCounter(10, 5) and makeCounter(1, 1), called a, a, b, a, b, should give {10, 15, 1, 20, 2}, but gave \" .. Course.show(seen))\n\tend)\nend\n\nlocal list = { 4, 9, 2, 7 }\nif has(\"r4\", \"map\") then\n\tlocal good, result = Course.call(K.map, list, function(n) return n * 10 end)\n\tCourse.check(\"r4\", good and Course.equal(result, { 40, 90, 20, 70 }) and not rawequal(result, list) and Course.equal(list, { 4, 9, 2, 7 }),\n\t\t\"map({4, 9, 2, 7}, times ten) should return a new list {40, 90, 20, 70} and leave the original alone, but \" .. (if good then \"returned \" .. Course.show(result) else \"errored: \" .. tostring(result)))\n\tlocal good2, result2 = Course.call(K.map, {}, function(n) return n end)\n\tCourse.check(\"r4\", good2 and Course.equal(result2, {}), \"map of an empty list should return an empty list.\")\nend\nif has(\"r4\", \"filter\") then\n\tlocal good, result = Course.call(K.filter, list, function(n) return n > 3 end)\n\tCourse.check(\"r4\", good and Course.equal(result, { 4, 9, 7 }) and Course.equal(list, { 4, 9, 2, 7 }),\n\t\t\"filter({4, 9, 2, 7}, over 3) should return {4, 9, 7}, but \" .. (if good then \"returned \" .. Course.show(result) else \"errored: \" .. tostring(result)))\nend\nif has(\"r5\", \"reduce\") then\n\tlocal good, sum = Course.call(K.reduce, list, function(total, n) return total + n end, 0)\n\tCourse.check(\"r5\", good and sum == 22, \"reduce({4, 9, 2, 7}, add, 0) should return 22, but \" .. (if good then \"returned \" .. Course.show(sum) else \"errored: \" .. tostring(sum)))\n\tlocal good2, biggest = Course.call(K.reduce, list, function(best, n) return math.max(best, n) end, -math.huge)\n\tCourse.check(\"r5\", good2 and biggest == 9, \"reduce with math.max should find 9, but \" .. (if good2 then \"returned \" .. Course.show(biggest) else \"errored: \" .. tostring(biggest)))\n\tlocal good3, empty = Course.call(K.reduce, {}, function(total, n) return total + n end, 100)\n\tCourse.check(\"r5\", good3 and empty == 100, \"reduce of an empty list should return the starting value, 100, but \" .. (if good3 then \"returned \" .. Course.show(empty) else \"errored: \" .. tostring(empty)))\nend\n\nif has(\"r6\", \"memoize\") then\n\tCourse.try(\"r6\", function()\n\t\tlocal calls = 0\n\t\tlocal function slowSquare(n)\n\t\t\tcalls += 1\n\t\t\treturn n * n\n\t\tend\n\t\tlocal good, fast = Course.call(K.memoize, slowSquare)\n\t\tif not good or type(fast) ~= \"function\" then\n\t\t\tCourse.fail(\"r6\", \"memoize should return a function, but returned \" .. Course.show(fast))\n\t\t\treturn\n\t\tend\n\t\tlocal results = { fast(3), fast(3), fast(4), fast(3), fast(4) }\n\t\tCourse.check(\"r6\", Course.equal(results, { 9, 9, 16, 9, 16 }), \"The memoised function should still return the right answers, {9, 9, 16, 9, 16}, but gave \" .. Course.show(results))\n\t\tCourse.check(\"r6\", calls == 2, \"The original function should only run once per different argument (2 times here), but it ran \" .. calls .. \" times.\")\n\t\tlocal otherCalls = 0\n\t\tlocal good2, other = Course.call(K.memoize, function(n)\n\t\t\totherCalls += 1\n\t\t\treturn n + 1\n\t\tend)\n\t\tif good2 and type(other) == \"function\" then\n\t\t\tCourse.check(\"r6\", other(3) == 4 and otherCalls == 1, \"Each memoised function needs its own cache. A second memoised function returned the first one's cached answer.\")\n\t\tend\n\tend)\nend\n\nif has(\"r7\", \"checkedDivide\") then\n\tlocal good, result = Course.call(K.checkedDivide, 10, 4)\n\tCourse.check(\"r7\", good and result == 2.5, \"checkedDivide(10, 4) should return 2.5, but \" .. (if good then \"returned \" .. Course.show(result) else \"errored: \" .. tostring(result)))\n\tlocal zeroOk, zeroErr = Course.call(K.checkedDivide, 1, 0)\n\tCourse.check(\"r7\", not zeroOk and string.find(tostring(zeroErr), \"can't divide by zero\", 1, true) ~= nil, \"checkedDivide(1, 0) should raise an error containing \\\"can't divide by zero\\\", but \" .. (if zeroOk then \"it returned normally\" else \"the error was \" .. Course.show(zeroErr)))\n\tlocal typeOk, typeErr = Course.call(K.checkedDivide, \"10\", 2)\n\tCourse.check(\"r7\", not typeOk and string.find(tostring(typeErr), \"numbers only\", 1, true) ~= nil, \"checkedDivide(\\\"10\\\", 2) should raise an error containing \\\"numbers only\\\", but \" .. (if typeOk then \"it returned normally\" else \"the error was \" .. Course.show(typeErr)))\nend\n\nif has(\"r8\", \"safeDivide\") then\n\tlocal good, a, b = Course.call(K.safeDivide, 9, 3)\n\tCourse.check(\"r8\", good and a == true and b == 3, \"safeDivide(9, 3) should return true, 3, but \" .. (if good then \"returned \" .. Course.show({ a, b }) else \"errored: \" .. tostring(a)))\n\tlocal good2, c, d = Course.call(K.safeDivide, 5, 0)\n\tCourse.check(\"r8\", good2 and c == false and string.find(tostring(d), \"can't divide by zero\", 1, true) ~= nil, \"safeDivide(5, 0) should return false and the error message, without erroring itself, but \" .. (if good2 then \"returned \" .. Course.show({ c, d }) else \"errored: \" .. tostring(c)))\nend\n",
+ "steps": [
+  "In the `Kitchen` tab, make a module table with these seven functions, and return it at the end.",
+  "`makeCounter(start, step)` returns a function. Calling that function gives `start` the first time, then adds `step` each time after. So after `local next = makeCounter(10, 5)`, calling `next()` three times gives `10`, `15`, then `20`. Every counter keeps its own count.",
+  "`map(list, fn)` gives a new list with `fn` applied to each item. `filter(list, fn)` gives a new list of only the items where `fn` returns true. Neither changes the original list.",
+  "`reduce(list, fn, start)`: begins at `start` and, for each item, replaces the running value with `fn(runningValue, item)`. Adding everything in `{4, 9, 2, 7}` from 0 gives `22`. An empty list gives `start`.",
+  "`memoize(fn)` returns a function that gives the same answers as `fn`, but remembers them. Asking for the same number twice only runs `fn` once.",
+  "`checkedDivide(a, b)` returns `a / b`. It raises an error containing `can't divide by zero` when `b` is 0, and one containing `numbers only` when either one isn't a number. Use `error` or `assert`.",
+  "`safeDivide(a, b)` uses `pcall` on `checkedDivide`. `safeDivide(9, 3)` gives `true, 3`, and `safeDivide(5, 0)` gives `false` and the error message."
+ ]
+}

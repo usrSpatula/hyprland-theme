@@ -1,0 +1,12 @@
+# Spotlight-style launcher (Super+D)
+width=680
+height=436
+location=top
+yoffset=200
+prompt=Spotlight Search
+allow_images=true
+image_size=30
+insensitive=true
+hide_scroll=true
+no_actions=true
+gtk_dark=true

@@ -1,0 +1,85 @@
+{
+ "id": "pytest01",
+ "chapter": 1,
+ "title": "Hello, terminal",
+ "runner": "program",
+ "timeout": 10,
+ "story": "You've been hired to write the start-up message for a small pizza shop's ordering terminal. When the program starts, it announces itself, says how many slices the night's dough makes, and shows the opening time in a neat format.",
+ "requirements": [
+  {
+   "id": "r1",
+   "text": "Your program runs without errors."
+  },
+  {
+   "id": "r2",
+   "text": "The first line printed is exactly `Python is running`."
+  },
+  {
+   "id": "r3",
+   "text": "It prints the number of slices from 24 pizzas with 8 slices each. Python must do the multiplication."
+  },
+  {
+   "id": "r4",
+   "text": "It prints the time as exactly `18:30`, using `print` with two values and `sep`."
+  },
+  {
+   "id": "r5",
+   "text": "It has at least one comment."
+  }
+ ],
+ "steps": [
+  "Line 1: print exactly `Python is running`.",
+  "Print how many slices 24 pizzas of 8 slices make. Write the multiplication, not the answer.",
+  "Print `18:30` by giving `print` the two values `18` and `30` and choosing a separator.",
+  "Add a comment explaining one of your lines."
+ ],
+ "hints": [
+  "Text goes in quotes. The multiplication doesn't, so Python works it out.",
+  "`sep=\":\"` goes after the values, inside the same brackets.",
+  "A comment starts with `#`."
+ ],
+ "static": [
+  {
+   "id": "r3",
+   "type": "uses",
+   "pattern": "24\\s*\\*\\s*8|8\\s*\\*\\s*24",
+   "fail": "Let Python do the multiplication: write `24 * 8` in your code."
+  },
+  {
+   "id": "r4",
+   "type": "uses",
+   "pattern": "sep\\s*=",
+   "fail": "Use `print`'s `sep=` setting to put the colon between the two numbers."
+  },
+  {
+   "id": "r5",
+   "type": "uses",
+   "pattern": "#",
+   "comments": true,
+   "fail": "Add a comment: a line (or the end of one) starting with `#`."
+  }
+ ],
+ "cases": [
+  {
+   "id": "r1",
+   "ok": true
+  },
+  {
+   "id": "r2",
+   "first": "Python is running",
+   "fail": "The first line isn't right."
+  },
+  {
+   "id": "r3",
+   "contains": [
+    "192"
+   ],
+   "fail": "None of the lines had the number of slices."
+  },
+  {
+   "id": "r4",
+   "regex": "^18:30$",
+   "fail": "There's no line that's exactly `18:30`."
+  }
+ ]
+}

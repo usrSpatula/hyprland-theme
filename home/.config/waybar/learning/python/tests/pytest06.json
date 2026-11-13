@@ -1,0 +1,124 @@
+{
+ "id": "pytest06",
+ "chapter": 6,
+ "title": "Order analytics",
+ "runner": "program",
+ "timeout": 10,
+ "story": "At closing time, the manager wants a quick summary of the night's orders. Each order is a string of words like `\"large pepperoni\"`. Write functions that the summary screen can call with any list of orders.",
+ "requirements": [
+  {
+   "id": "r1",
+   "text": "`count_words(orders)` returns a dictionary counting how many times each word appears across all the orders, in lowercase."
+  },
+  {
+   "id": "r2",
+   "text": "`most_popular(orders)` returns the word that appears most often. If there's a tie, the word that comes first alphabetically wins. With no orders, it returns `None`."
+  },
+  {
+   "id": "r3",
+   "text": "`unique_sorted(orders)` returns a sorted list of each different word, lowercase, with no repeats."
+  },
+  {
+   "id": "r4",
+   "text": "`long_orders(orders, n)` returns a list of the orders with more than n words, in their original order."
+  },
+  {
+   "id": "r5",
+   "text": "Calling the functions doesn't change the list passed in."
+  }
+ ],
+ "steps": [
+  "Split each order into words, and lowercase them.",
+  "Count them with the dictionary counting pattern.",
+  "Reuse `count_words` inside `most_popular`.",
+  "Sets remove repeats; `sorted` turns a set into a sorted list."
+ ],
+ "hints": [
+  "`order.lower().split()` gives a list of lowercase words.",
+  "For ties, sort the candidates, or compare with a key that uses the count first and the word second.",
+  "A list comprehension with an `if` suits `long_orders`."
+ ],
+ "static": [
+  {
+   "id": "r1",
+   "type": "uses",
+   "pattern": "def\\s+count_words\\s*\\(",
+   "fail": "Define a function called `count_words`."
+  },
+  {
+   "id": "r2",
+   "type": "uses",
+   "pattern": "def\\s+most_popular\\s*\\(",
+   "fail": "Define a function called `most_popular`."
+  },
+  {
+   "id": "r3",
+   "type": "uses",
+   "pattern": "def\\s+unique_sorted\\s*\\(",
+   "fail": "Define a function called `unique_sorted`."
+  },
+  {
+   "id": "r4",
+   "type": "uses",
+   "pattern": "def\\s+long_orders\\s*\\(",
+   "fail": "Define a function called `long_orders`."
+  }
+ ],
+ "cases": [
+  {
+   "id": "r1",
+   "append": "print(sorted(count_words(['Large pepperoni', 'small Pepperoni', 'large veggie']).items()))",
+   "last": "[('large', 2), ('pepperoni', 2), ('small', 1), ('veggie', 1)]",
+   "label": "three orders",
+   "fail": ""
+  },
+  {
+   "id": "r1",
+   "append": "print(count_words([]))",
+   "last": "{}",
+   "label": "no orders",
+   "fail": ""
+  },
+  {
+   "id": "r2",
+   "append": "print(most_popular(['ham ham', 'cheese', 'cheese olive', 'ham']))",
+   "last": "ham",
+   "label": "ham three times",
+   "fail": ""
+  },
+  {
+   "id": "r2",
+   "append": "print(most_popular(['olive cheese', 'cheese olive']))",
+   "last": "cheese",
+   "label": "a tie between olive and cheese",
+   "fail": ""
+  },
+  {
+   "id": "r2",
+   "append": "print(most_popular([]))",
+   "last": "None",
+   "label": "no orders",
+   "fail": ""
+  },
+  {
+   "id": "r3",
+   "append": "print(unique_sorted(['B a', 'a c', 'C']))",
+   "last": "['a', 'b', 'c']",
+   "label": "`['B a', 'a c', 'C']`",
+   "fail": ""
+  },
+  {
+   "id": "r4",
+   "append": "print(long_orders(['a b c', 'a', 'a b', 'w x y z'], 2))",
+   "last": "['a b c', 'w x y z']",
+   "label": "n = 2",
+   "fail": ""
+  },
+  {
+   "id": "r5",
+   "append": "data = ['Big Ham', 'ham']\ncount_words(data); most_popular(data); unique_sorted(data); long_orders(data, 1)\nprint(data)",
+   "last": "['Big Ham', 'ham']",
+   "fail": "Your functions changed the list they were given."
+  }
+ ]
+}

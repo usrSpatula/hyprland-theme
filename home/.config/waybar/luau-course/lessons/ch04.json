@@ -1,0 +1,329 @@
+{
+ "chapter": "ch04",
+ "lessons": [
+  {
+   "id": "ch04-l1",
+   "title": "Counting with for loops",
+   "summary": "The numeric for loop: start, stop and step, and the rules about its loop variable.",
+   "minutes": 10,
+   "sections": [
+    {
+     "heading": "Repeating code",
+     "body": "A **loop** runs a block of code many times. Without loops, delivering to 20 houses would mean writing the same lines 20 times, and changing it to 30 houses would mean writing ten more. With a loop you write the work once and say how many times to do it.\n\nThe numeric `for` loop counts. You write `for`, a variable name, an equals sign, a start number, a comma, a stop number, then `do`, the block, and `end`. The variable takes each value from start to stop in turn, and the block runs once for each.",
+     "example": {
+      "caption": "Five houses",
+      "code": "for house = 1, 5 do\n\tprint(\"Knocking on house\", house)\nend",
+      "explain": "Prints five lines, for houses 1, 2, 3, 4 and 5. Both ends are included."
+     }
+    },
+    {
+     "heading": "Steps",
+     "body": "An optional third number is the **step**, how much to add each time. With a step of 2, `for i = 1, 9, 2` gives 1, 3, 5, 7 and 9. With a negative step you count down: `for i = 10, 1, -1` gives 10 down to 1. Without a step, Luau adds 1.\n\nIf the start is already past the stop, the loop runs **zero** times, which is usually exactly what you want. A loop from 1 to 0 does nothing, so a list with no items needs no special case. Counting down needs that negative step, though: from 10 to 1 with the default step runs zero times, since 10 is already past 1.",
+     "example": {
+      "caption": "A countdown",
+      "code": "for seconds = 3, 1, -1 do\n\tprint(seconds)\nend\nprint(\"Lights out\")",
+      "explain": "Prints 3, 2, 1, then `Lights out`."
+     }
+    },
+    {
+     "heading": "The loop variable",
+     "body": "The loop variable only exists inside the loop. After `end`, the name is gone, so if you need a value after the loop, store it in a variable declared before it.\n\nDon't assign to the loop variable inside the block. The loop keeps its own internal count, so changing the variable won't skip ahead the way you might hope, and it makes the code confusing. The start, stop and step are also worked out **once**, when the loop begins, so changing a variable used as the stop number during the loop has no effect."
+    },
+    {
+     "heading": "Using the count",
+     "body": "The loop variable is just a number, so you can do maths with it. That's how you get patterns like \"every third house\", which is when the number's remainder after dividing by 3 is 0, or \"floor 5 is 4 times 5 studs high\", which is the number times 4.\n\nMany loops combine the count with an `if`. The loop says \"for each house\", and the `if` decides what happens at that particular house. Most game logic you'll ever write is some mix of loops and decisions."
+    }
+   ],
+   "key_points": [
+    "`for i = start, stop, step do ... end` counts, including both ends.",
+    "The step defaults to 1. Use a negative step to count down.",
+    "If start is already past stop, the loop runs zero times.",
+    "The loop variable only exists inside the loop. Don't assign to it."
+   ],
+   "mistakes": [
+    "Counting down without `-1`, so the loop runs zero times.",
+    "Expecting the loop variable to still exist after `end`.",
+    "Being off by one: `1, 10` runs ten times, `0, 10` runs eleven."
+   ],
+   "try_it": "Print the 7 times table up to 7 times 12. Then print only the even numbers from 2 to 20 using a step, then count down from 10 to 0 in twos.",
+   "quiz": [
+    {
+     "question": "How many times does `for i = 2, 10, 2 do ... end` run?",
+     "choices": [
+      "4",
+      "5",
+      "8",
+      "9"
+     ],
+     "answer": 1,
+     "explain": "It runs for 2, 4, 6, 8 and 10. Both ends are included."
+    },
+    {
+     "question": "What does `for i = 5, 1 do print(i) end` print?",
+     "choices": [
+      "5, 4, 3, 2, 1",
+      "1 to 5",
+      "Only 5",
+      "Nothing"
+     ],
+     "answer": 3,
+     "explain": "Without a negative step it counts up, and 5 is already past 1, so it runs zero times."
+    },
+    {
+     "question": "After a loop `for house = 1, 10 do ... end`, what is `house`?",
+     "choices": [
+      "10",
+      "11",
+      "`nil`, because the loop variable only exists inside the loop",
+      "1"
+     ],
+     "answer": 2,
+     "explain": "The loop variable belongs to the loop. Outside it, the name isn't defined."
+    }
+   ]
+  },
+  {
+   "id": "ch04-l2",
+   "title": "while and repeat",
+   "summary": "Loops that run until a condition changes, the difference between while and repeat, and how infinite loops freeze games.",
+   "minutes": 10,
+   "sections": [
+    {
+     "heading": "while loops",
+     "body": "A `for` loop is for when you know how many times to repeat. When you don't, and you only know **when to stop**, use `while`. It checks a condition, runs the block if it's truthy, then checks again, and keeps going until the condition is falsy.\n\nThe block must eventually make the condition false, usually by changing a variable the condition reads. Otherwise the loop never ends.",
+     "example": {
+      "caption": "Spending until the money runs out",
+      "code": "local coins = 20\nlocal pizzas = 0\nwhile coins >= 6 do\n\tcoins -= 6\n\tpizzas += 1\nend\nprint(pizzas, coins)",
+      "explain": "Prints `3 2`: three pizzas at 6 coins each, with 2 coins left."
+     }
+    },
+    {
+     "heading": "repeat until",
+     "body": "`repeat` runs its block **first** and checks afterwards. You write `repeat`, the block, then `until` and a condition, with no `end`. The loop stops when the condition becomes **true**, which is the opposite of `while`.\n\nBecause it checks at the end, the block always runs at least once. That suits things like \"roll a dice until it isn't a 1\": you have to roll before you can check. A handy detail is that the `until` condition can see local variables created inside the block."
+    },
+    {
+     "heading": "Infinite loops",
+     "body": "A loop whose condition never becomes false runs forever. In most programs that's a bug, but in games it's often deliberate: a game loop that checks something every few seconds for as long as the server runs. Those loops look like `while true do`.\n\nThe crucial rule is that such a loop must **wait** inside, using `task.wait(seconds)`. Luau runs one piece of code at a time, so a loop that never waits never lets anything else run. Studio freezes, and Roblox eventually kills the script with a timeout error. You'll learn exactly why in chapter 10. For now: every loop that might run for a long time needs a `task.wait` inside it.",
+     "example": {
+      "caption": "A safe forever loop",
+      "code": "while true do\n\tprint(\"The lamp flickers\")\n\ttask.wait(5)\nend",
+      "explain": "Prints every five seconds, forever, and lets the rest of the game keep running in between."
+     }
+    },
+    {
+     "heading": "Choosing a loop",
+     "body": "Use `for` when you're counting or know the number of steps. Use `while` when you're waiting for a condition, and it might already be met before the first step. Use `repeat` when the block must run at least once.\n\nIf you find yourself writing a `while` loop with a counter you add one to each time, that's a `for` loop in disguise, and the `for` version will be shorter and harder to get wrong."
+    }
+   ],
+   "key_points": [
+    "`while cond do ... end` checks first, and may run zero times.",
+    "`repeat ... until cond` runs at least once and stops when the condition becomes true.",
+    "A loop that never ends must call `task.wait` inside, or it freezes the game.",
+    "If you're counting, use `for` instead."
+   ],
+   "mistakes": [
+    "Forgetting to change the variable the condition depends on, so the loop never ends.",
+    "Writing `while true do` without a wait.",
+    "Mixing up `until` (stop when true) with `while` (continue while true)."
+   ],
+   "try_it": "Start with 1 coin and double it each step with a while loop until it's over 1,000, counting the steps. Then write a repeat loop that counts down from 5 and stops at 0. Finally, write a forever loop with a short wait that prints a message, and stop the playtest when you've seen it a few times.",
+   "quiz": [
+    {
+     "question": "How many times does `local n = 10 while n < 5 do n += 1 end` run its block?",
+     "choices": [
+      "Zero",
+      "Once",
+      "Five times",
+      "Forever"
+     ],
+     "answer": 0,
+     "explain": "10 isn't less than 5, so the condition is false before the first run."
+    },
+    {
+     "question": "When does `repeat ... until done` stop?",
+     "choices": [
+      "When `done` is false",
+      "When `done` is true",
+      "After one run, whatever `done` is",
+      "Never"
+     ],
+     "answer": 1,
+     "explain": "until is the stopping condition: the loop ends when it becomes true."
+    },
+    {
+     "question": "Why must `while true do` contain `task.wait`?",
+     "choices": [
+      "Luau requires it in every while loop",
+      "To make the loop run faster",
+      "To save memory",
+      "Without it, nothing else can run and the game freezes"
+     ],
+     "answer": 3,
+     "explain": "Luau runs one thing at a time, so a loop that never waits hogs everything."
+    }
+   ]
+  },
+  {
+   "id": "ch04-l3",
+   "title": "break and continue",
+   "summary": "Leaving a loop early with break, and skipping to the next round with continue.",
+   "minutes": 8,
+   "sections": [
+    {
+     "heading": "break",
+     "body": "`break` leaves a loop immediately. Whatever was left of the current run is skipped, the loop doesn't run again, and the script carries on after the loop's `end`.\n\nIt's how you stop as soon as you've found what you were looking for, or as soon as something goes wrong. Searching through houses for the first one with its lights on is a natural fit: once you've found it, there's no point checking the rest.",
+     "example": {
+      "caption": "Stopping at the first match",
+      "code": "for house = 1, 50 do\n\tif house % 13 == 0 then\n\t\tprint(\"Unlucky house:\", house)\n\t\tbreak\n\tend\nend",
+      "explain": "Prints `Unlucky house: 13` and stops. Houses 14 to 50 are never checked."
+     }
+    },
+    {
+     "heading": "continue",
+     "body": "`continue` skips the rest of the current run and moves on to the next one. The loop itself keeps going. It's Luau's way of saying \"nothing to do for this one\".\n\nIt keeps code flat. Instead of wrapping the whole body in `if this house is lit then ... end`, you write `if this house isn't lit then continue end` at the top and carry on normally. That's the same guard idea from the last chapter, applied to loops. `continue` is a Luau addition, so you won't find it in older Lua tutorials, which used workarounds instead.",
+     "example": {
+      "caption": "Skipping some rounds",
+      "code": "for house = 1, 6 do\n\tif house % 3 == 0 then\n\t\tcontinue\n\tend\n\tprint(\"Deliver to\", house)\nend",
+      "explain": "Delivers to 1, 2, 4 and 5. Houses 3 and 6 are skipped, but the loop carries on."
+     }
+    },
+    {
+     "heading": "Only the nearest loop",
+     "body": "Both `break` and `continue` affect only the **innermost** loop they're in. If you're in a loop inside another loop, `break` leaves the inner one and the outer loop carries on with its next round.\n\nTo stop both, a common pattern is a boolean like `found` that you set before breaking, and check in the outer loop. In chapter 5 you'll see a cleaner way: put the loops in a function and `return` from it, which ends everything at once."
+    },
+    {
+     "heading": "Using them well",
+     "body": "`break` and `continue` are great when they make a loop easier to read, and harmful when there are so many that the flow becomes hard to follow. A good rule is one or two per loop, near the top or at a clear moment, each with an obvious reason.\n\nBefore reaching for `break`, ask whether a `while` condition would say the same thing more directly. \"Keep going while there's money\" is often clearer than \"loop forever, and break when the money runs out\"."
+    }
+   ],
+   "key_points": [
+    "`break` leaves the loop entirely.",
+    "`continue` skips to the next run of the loop.",
+    "Both only affect the innermost loop.",
+    "Use them to keep loops flat, not to tangle them."
+   ],
+   "mistakes": [
+    "Expecting `break` to leave every loop it's nested in.",
+    "Putting code after `break` in the same block, which can never run.",
+    "Using `continue` where an if around a single line would be simpler."
+   ],
+   "try_it": "Loop over numbers 1 to 100 and print the first number that's divisible by both 6 and 8, then stop. Then print every number from 1 to 20 except multiples of 5, using continue.",
+   "quiz": [
+    {
+     "question": "What does `for i = 1, 5 do if i == 3 then break end print(i) end` print?",
+     "choices": [
+      "1, 2, 4, 5",
+      "1, 2, 3",
+      "1, 2",
+      "Nothing"
+     ],
+     "answer": 2,
+     "explain": "The loop prints 1 and 2, then breaks before printing 3."
+    },
+    {
+     "question": "What does `for i = 1, 5 do if i == 3 then continue end print(i) end` print?",
+     "choices": [
+      "1, 2, 4, 5",
+      "1, 2",
+      "3",
+      "1 to 5"
+     ],
+     "answer": 0,
+     "explain": "continue skips printing 3, and the loop carries on to 4 and 5."
+    },
+    {
+     "question": "A `break` sits inside an inner loop, inside an outer loop. What does it leave?",
+     "choices": [
+      "Both loops",
+      "The whole script",
+      "Nothing, break only works in while loops",
+      "Just the inner loop"
+     ],
+     "answer": 3,
+     "explain": "break only leaves the loop it's directly in."
+    }
+   ]
+  },
+  {
+   "id": "ch04-l4",
+   "title": "Loop patterns",
+   "summary": "Totals, counts, searches and nested loops: the handful of shapes most loops take.",
+   "minutes": 10,
+   "sections": [
+    {
+     "heading": "Accumulating a total",
+     "body": "The most common loop pattern is the **accumulator**: start a variable at zero before the loop, add to it inside, and use it after. Totals, scores and counts all work this way.\n\nThe variable must be declared **before** the loop. Declared inside, it would be created fresh on every run and thrown away at the end of each one.",
+     "example": {
+      "caption": "Adding up a night's tips",
+      "code": "local total = 0\nfor night = 1, 7 do\n\ttotal += night * 2\nend\nprint(\"Tips this week:\", total)",
+      "explain": "Adds 2, 4, 6 and so on up to 14, and prints `Tips this week: 56`."
+     }
+    },
+    {
+     "heading": "Counting and searching",
+     "body": "Counting is an accumulator that adds one when something is true: how many houses have their lights on, how many deliveries were late. Searching is a loop that stops with `break` at the first match, usually storing what it found in a variable declared before the loop.\n\nFor searches, start the result variable as `nil`. After the loop, `nil` means \"not found\", which is easy to check with an `if`.\n\nA search can also stop the moment the answer is certain the other way. Checking whether **every** house has paid, for example, can stop at the first one that hasn't, since one unpaid house is enough to make the answer no."
+    },
+    {
+     "heading": "Building text",
+     "body": "You can build a string in a loop with `..=`, adding a piece each time. A common detail is separators: you want commas **between** items, not after the last one. One way is to add the comma before every item except the first, by checking whether the loop is on its first run.\n\nFor long lists, joining strings one at a time gets slow, because each join makes a new string. Chapter 6 introduces `table.concat`, which joins a whole list in one go."
+    },
+    {
+     "heading": "Nested loops",
+     "body": "A loop inside a loop runs its inner block once for **every combination**. A loop over 3 floors containing a loop over 4 rooms runs the inner block 12 times. That's perfect for grids: rows and columns, floors and rooms, or every pair of players.\n\nThe cost multiplies, though. Ten times ten is a hundred runs, but a thousand times a thousand is a million, which is enough to make a game stutter. Before nesting loops over big numbers, ask whether you really need every combination.",
+     "example": {
+      "caption": "A small grid",
+      "code": "for floor = 1, 2 do\n\tfor room = 1, 3 do\n\t\tprint(\"Room \" .. floor .. \"0\" .. room)\n\tend\nend",
+      "explain": "Prints rooms 101, 102, 103, then 201, 202, 203."
+     }
+    }
+   ],
+   "key_points": [
+    "Accumulators start before the loop and change inside it.",
+    "Searches store the result and `break`. `nil` after the loop means not found.",
+    "Watch separators when building text in a loop.",
+    "Nested loops multiply: the inner block runs for every combination."
+   ],
+   "mistakes": [
+    "Declaring the total inside the loop, so it resets every time.",
+    "Adding a separator after the last item as well.",
+    "Nesting loops over large ranges without noticing how many runs that makes."
+   ],
+   "try_it": "Add up all the numbers from 1 to 100 with a loop and check you get 5050. Count how many numbers from 1 to 100 are divisible by 7. Then print a 5 by 5 grid of dots, one row per line, by building each row as a string.",
+   "quiz": [
+    {
+     "question": "A loop over 4 rows contains a loop over 6 columns. How many times does the inner block run?",
+     "choices": [
+      "10",
+      "6",
+      "24",
+      "4"
+     ],
+     "answer": 2,
+     "explain": "The inner loop runs 6 times for each of the 4 rows: 4 times 6 is 24."
+    },
+    {
+     "question": "Why must an accumulator be declared before the loop?",
+     "choices": [
+      "Inside the loop it would be reset to its starting value on every run",
+      "Luau doesn't allow declarations inside loops",
+      "It makes the loop run faster",
+      "So the loop variable can see it"
+     ],
+     "answer": 0,
+     "explain": "A local declared inside the loop body is created fresh each run, so it can't build up a total."
+    },
+    {
+     "question": "After a search loop, the result variable is still `nil`. What does that mean?",
+     "choices": [
+      "The loop crashed",
+      "Nothing matched",
+      "The first item matched",
+      "The loop never started"
+     ],
+     "answer": 1,
+     "explain": "The result starts as nil and is only set when a match is found."
+    }
+   ]
+  }
+ ]
+}

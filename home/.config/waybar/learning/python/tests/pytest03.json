@@ -1,0 +1,135 @@
+{
+ "id": "pytest03",
+ "chapter": 3,
+ "title": "Delivery time checker",
+ "runner": "program",
+ "timeout": 10,
+ "story": "The shop promises a pizza within 30 minutes or the customer gets money off. The till sends your program two lines: how many minutes the delivery took, and whether the customer is a member (`yes` or `no`, in any capitals). Your program prints what the customer gets.",
+ "requirements": [
+  {
+   "id": "r1",
+   "text": "It reads the minutes (a whole number) and the member answer with `input()`."
+  },
+  {
+   "id": "r2",
+   "text": "Up to and including 30 minutes, it prints `On time`."
+  },
+  {
+   "id": "r3",
+   "text": "From 31 to 45 minutes, it prints `10% off`."
+  },
+  {
+   "id": "r4",
+   "text": "Over 45 minutes, it prints `Free pizza`."
+  },
+  {
+   "id": "r5",
+   "text": "Members who are late (over 30) also get a second line: `Member bonus: free drink`. Members who are on time don't."
+  },
+  {
+   "id": "r6",
+   "text": "The member answer ignores capitals and spaces, so ` YES ` counts as yes."
+  }
+ ],
+ "steps": [
+  "Read the minutes with `int(input())`, then the member answer.",
+  "Use if, elif and else to print one of `On time`, `10% off` or `Free pizza`.",
+  "Then, separately, print the member bonus if they're a member and the delivery took over 30 minutes."
+ ],
+ "hints": [
+  "Order your conditions from smallest to largest, using `<=`.",
+  "Clean the answer with `.strip().lower()` before comparing it to `\"yes\"`.",
+  "The bonus needs both conditions, so join them with `and`."
+ ],
+ "static": [
+  {
+   "id": "r1",
+   "type": "uses",
+   "pattern": "\\bif\\b",
+   "fail": "Use an if statement to make the decision."
+  }
+ ],
+ "cases": [
+  {
+   "id": "r1",
+   "stdin": "20\nno\n",
+   "ok": true
+  },
+  {
+   "id": "r2",
+   "stdin": "30\nno\n",
+   "lines": [
+    "On time"
+   ],
+   "label": "30 minutes, not a member",
+   "fail": ""
+  },
+  {
+   "id": "r2",
+   "stdin": "5\nyes\n",
+   "lines": [
+    "On time"
+   ],
+   "label": "5 minutes, a member",
+   "fail": ""
+  },
+  {
+   "id": "r3",
+   "stdin": "31\nno\n",
+   "lines": [
+    "10% off"
+   ],
+   "label": "31 minutes, not a member",
+   "fail": ""
+  },
+  {
+   "id": "r3",
+   "stdin": "45\nno\n",
+   "lines": [
+    "10% off"
+   ],
+   "label": "45 minutes, not a member",
+   "fail": ""
+  },
+  {
+   "id": "r4",
+   "stdin": "46\nno\n",
+   "lines": [
+    "Free pizza"
+   ],
+   "label": "46 minutes, not a member",
+   "fail": ""
+  },
+  {
+   "id": "r5",
+   "stdin": "40\nyes\n",
+   "lines": [
+    "10% off",
+    "Member bonus: free drink"
+   ],
+   "label": "40 minutes, a member",
+   "fail": ""
+  },
+  {
+   "id": "r5",
+   "stdin": "60\nyes\n",
+   "lines": [
+    "Free pizza",
+    "Member bonus: free drink"
+   ],
+   "label": "60 minutes, a member",
+   "fail": ""
+  },
+  {
+   "id": "r6",
+   "stdin": "50\n  YES \n",
+   "lines": [
+    "Free pizza",
+    "Member bonus: free drink"
+   ],
+   "label": "50 minutes and `  YES `",
+   "fail": ""
+  }
+ ],
+ "run_stdin": "40\nyes\n"
+}

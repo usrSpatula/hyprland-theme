@@ -1,0 +1,77 @@
+{
+ "id": "test07",
+ "chapter": 7,
+ "title": "The text kitchen",
+ "runner": "edit",
+ "timeout": 25,
+ "story": "The pizzeria's ordering system is full of text: prices to display, scribbled order slips to read, and a chat filter for the delivery drivers, who keep typing things that scare the customers. Build a module of text and maths tools to handle all of it.",
+ "create": [
+  "A Folder named `Test07` inside `ServerScriptService.Course`.",
+  "A ModuleScript named `TextTools` inside `Test07`, returning a table of functions."
+ ],
+ "requirements": [
+  {
+   "id": "r1",
+   "text": "A ModuleScript named `TextTools`."
+  },
+  {
+   "id": "r2",
+   "text": "It returns a table with the functions `formatPrice`, `initials`, `parseOrder`, `censor`, `roundTo` and `clampSpeed`."
+  },
+  {
+   "id": "r3",
+   "text": "`formatPrice(amount)` returns a dollar sign and the amount with exactly two decimal places, like `\"$12.50\"` or `\"$3.00\"`."
+  },
+  {
+   "id": "r4",
+   "text": "`initials(fullName)` returns the first letter of every word, in capitals, with no spaces: `\"Mary Ann Hill\"` gives `\"MAH\"`. Extra spaces anywhere are ignored, and an empty name gives `\"\"`."
+  },
+  {
+   "id": "r5",
+   "text": "`parseOrder(text)` reads slips shaped exactly like `\"3x pepperoni\"`: a whole number, an `x`, at least one space, then the item. It returns the count as a number and the item as a string, like `3, \"pepperoni\"`. For anything not in that shape it returns `nil`."
+  },
+  {
+   "id": "r6",
+   "text": "`censor(message, badWords)` returns the message with every exact, case-sensitive occurrence of each word in the `badWords` array replaced by the same number of asterisks. Words may contain characters like dots, which must be treated as plain text."
+  },
+  {
+   "id": "r7",
+   "text": "`roundTo(value, places)` returns the value rounded to that many decimal places, with halves rounding away from zero: `roundTo(3.14159, 2)` is `3.14`."
+  },
+  {
+   "id": "r8",
+   "text": "`clampSpeed(speed)` returns the speed kept between 0 and 32."
+  }
+ ],
+ "hints": [
+  "formatPrice is one call to string.format. initials loops over the words with gmatch.",
+  "For parseOrder, write one anchored pattern with two captures, then convert the number capture with tonumber before returning it.",
+  "In censor, the word is plain text but gsub expects a pattern. Escape every non-alphanumeric character in the word with a percent sign first, then build the asterisks with rep."
+ ],
+ "static": [
+  {
+   "id": "r1",
+   "type": "exists",
+   "path": "ServerScriptService.Course.Test07.TextTools",
+   "class": "ModuleScript",
+   "fail": "Create a ModuleScript named `TextTools` inside the `Test07` folder."
+  },
+  {
+   "id": "r8",
+   "type": "uses",
+   "path": "ServerScriptService.Course.Test07.TextTools",
+   "pattern": "\\bmath\\.clamp\\s*\\(",
+   "fail": "Use math.clamp for clampSpeed."
+  }
+ ],
+ "check": "local path = \"ServerScriptService.Course.Test07.TextTools\"\nlocal T, info = Course.load(path)\nlocal ok = type(T) == \"table\"\nCourse.check(\"r2\", ok, \"TextTools should return a table of functions, but it returned \" .. Course.show(T) .. (if info.error then \" (\" .. info.error .. \")\" else \"\"))\nlocal names = { \"formatPrice\", \"initials\", \"parseOrder\", \"censor\", \"roundTo\", \"clampSpeed\" }\nif ok then\n\tfor _, name in names do\n\t\tCourse.check(\"r2\", type(T[name]) == \"function\", \"TextTools.\" .. name .. \" should be a function, but it's \" .. Course.show(T[name]) .. \".\")\n\tend\nend\n\nlocal function try(id, name, args, compare, wanted)\n\tif not ok or type(T[name]) ~= \"function\" then\n\t\tCourse.fail(id, \"Not checked: TextTools.\" .. name .. \" is missing.\")\n\t\treturn\n\tend\n\tlocal results = table.pack(Course.call(T[name], table.unpack(args, 1, args.n or #args)))\n\tlocal shown = {}\n\tfor i = 1, (args.n or #args) do\n\t\tshown[i] = Course.show(args[i])\n\tend\n\tlocal label = name .. \"(\" .. table.concat(shown, \", \") .. \")\"\n\tif not results[1] then\n\t\tCourse.fail(id, label .. \" errored: \" .. tostring(results[2]))\n\t\treturn\n\tend\n\tlocal got = { table.unpack(results, 2, results.n) }\n\tlocal shownWanted = if type(wanted) == \"string\" then wanted else Course.show(wanted)\n\tCourse.check(id, compare(got, wanted), label .. \" should return \" .. shownWanted .. \", but returned \" .. Course.show(got))\nend\nlocal function same(got, wanted)\n\tif #got ~= #wanted then\n\t\treturn false\n\tend\n\tfor i = 1, #wanted do\n\t\tif got[i] ~= wanted[i] then\n\t\t\treturn false\n\t\tend\n\tend\n\treturn true\nend\nlocal function close(got, wanted)\n\treturn #got == 1 and type(got[1]) == \"number\" and Course.near(got[1], wanted[1], 1e-9)\nend\n\nfor _, case in { { 12.5, \"$12.50\" }, { 3, \"$3.00\" }, { 0.1 + 0.2, \"$0.30\" }, { 1234.567, \"$1234.57\" }, { 0, \"$0.00\" } } do\n\ttry(\"r3\", \"formatPrice\", { case[1] }, same, { case[2] })\nend\nfor _, case in { { \"Mary Ann Hill\", \"MAH\" }, { \"bob vance\", \"BV\" }, { \"  ghost   driver  \", \"GD\" }, { \"\", \"\" }, { \"x\", \"X\" } } do\n\ttry(\"r4\", \"initials\", { case[1] }, same, { case[2] })\nend\nfor _, case in { { \"3x pepperoni\", { 3, \"pepperoni\" } }, { \"12x ghost chilli\", { 12, \"ghost chilli\" } }, { \"pepperoni\", {} }, { \"x3 cheese\", {} }, { \"2x\", {} }, { \"7x  garlic bread\", { 7, \"garlic bread\" } }, { \"abc 3x pepperoni\", {} }, { \"3xpepperoni\", {} } } do\n\tlocal wanted = case[2]\n\ttry(\"r5\", \"parseOrder\", { case[1] }, function(got)\n\t\tif #wanted == 0 then\n\t\t\treturn got[1] == nil\n\t\tend\n\t\treturn got[1] == wanted[1] and got[2] == wanted[2]\n\tend, if #wanted == 0 then \"nil\" else wanted)\nend\nfor _, case in {\n\t{ \"the monster is here\", { \"monster\" }, \"the ******* is here\" },\n\t{ \"run run RUN\", { \"run\" }, \"*** *** RUN\" },\n\t{ \"a ghost and a goblin\", { \"ghost\", \"goblin\" }, \"a ***** and a ******\" },\n\t{ \"all clear\", {}, \"all clear\" },\n\t{ \"price 3.50 now\", { \"3.50\" }, \"price **** now\" },\n\t{ \"price 3750 and 3.50\", { \"3.50\" }, \"price 3750 and ****\" },\n} do\n\ttry(\"r6\", \"censor\", { case[1], case[2] }, same, { case[3] })\nend\nfor _, case in { { 3.14159, 2, 3.14 }, { 2.5, 0, 3 }, { 1234.5678, 1, 1234.6 }, { -1.25, 1, -1.3 }, { 7, 3, 7 } } do\n\ttry(\"r7\", \"roundTo\", { case[1], case[2] }, close, { case[3] })\nend\nfor _, case in { { 10, 10 }, { -5, 0 }, { 40, 32 }, { 32, 32 }, { 0, 0 } } do\n\ttry(\"r8\", \"clampSpeed\", { case[1] }, same, { case[2] })\nend\n",
+ "steps": [
+  "In the `TextTools` tab, make a module table with these six functions, and return it at the end.",
+  "`formatPrice(amount)`: `formatPrice(12.5)` gives `\"$12.50\"`, and `formatPrice(3)` gives `\"$3.00\"`. Always two decimal places.",
+  "`initials(fullName)`: the first letter of every word, in capitals. `initials(\"Mary Ann Hill\")` gives `\"MAH\"`. Extra spaces don't matter, and an empty name gives `\"\"`.",
+  "`parseOrder(text)`: `parseOrder(\"3x pepperoni\")` gives two values, the number `3` and the string `\"pepperoni\"`. Anything not shaped exactly like that, such as `\"pepperoni\"`, `\"3xpepperoni\"` or `\"abc 3x cheese\"`, gives `nil`.",
+  "`censor(message, badWords)`: replaces each bad word with the same number of stars. `censor(\"the monster is here\", {\"monster\"})` gives `\"the ******* is here\"`. Capitals must match exactly, and a dot in a bad word means a real dot, not \"any character\".",
+  "`roundTo(value, places)`: `roundTo(3.14159, 2)` gives `3.14`, and `roundTo(2.5, 0)` gives `3`.",
+  "`clampSpeed(speed)`: keeps the speed between 0 and 32 using `math.clamp`. So `clampSpeed(40)` gives `32`, and `clampSpeed(-5)` gives `0`."
+ ]
+}

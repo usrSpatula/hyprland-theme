@@ -1,0 +1,405 @@
+{
+ "chapter": "ch05",
+ "lessons": [
+  {
+   "id": "ch05-l1",
+   "title": "Defining and calling functions",
+   "summary": "Packaging code under a name, giving it inputs with parameters, and running it whenever you like.",
+   "minutes": 10,
+   "sections": [
+    {
+     "heading": "Why functions",
+     "body": "A **function** is a named block of code you can run whenever you want, as many times as you want. You've been calling functions since chapter 1: `print` and `warn` are functions someone else wrote. Now you'll write your own.\n\nFunctions solve three problems at once. They stop you repeating code, because you write it once and call it everywhere. They give a piece of logic a name, so `applyLateDiscount()` explains itself. And they let you change behaviour in one place, which every caller then picks up."
+    },
+    {
+     "heading": "Defining one",
+     "body": "Write `local function`, a name, brackets, the block, and `end`. Defining a function doesn't run it. It just stores the code under that name. To run it, **call** it: write its name followed by brackets.\n\nBecause scripts run top to bottom, a function must be defined above the line that calls it. Calling it earlier finds nothing yet, and you'll get \"attempt to call a nil value\".",
+     "example": {
+      "caption": "Define once, call twice",
+      "code": "local function ringDoorbell()\n\tprint(\"Ding dong\")\nend\n\nringDoorbell()\nringDoorbell()",
+      "explain": "Prints `Ding dong` twice. The definition alone prints nothing."
+     }
+    },
+    {
+     "heading": "Parameters and arguments",
+     "body": "A function becomes far more useful when it takes inputs. Names inside the brackets of the definition are **parameters**: local variables that receive values when the function is called. The values you pass in the call are **arguments**, matched to the parameters by position, first to first, second to second.\n\nIf you pass fewer arguments than there are parameters, the missing ones are `nil`. If you pass more, the extras are ignored. Neither is an error, which is convenient but also means a forgotten argument can quietly become `nil` and cause trouble later.",
+     "example": {
+      "caption": "A function with inputs",
+      "code": "local function greet(name, house)\n\tprint(\"Pizza for \" .. name .. \" at number \" .. house)\nend\n\ngreet(\"Mrs Hill\", 14)\ngreet(\"Mr Vance\", 3)",
+      "explain": "One function, two different deliveries. name and house take new values on each call."
+     }
+    },
+    {
+     "heading": "Naming and size",
+     "body": "Name functions after what they **do**, usually starting with a verb: `calculateTip`, `spawnCustomer`, `isNight`. Functions that answer a yes-or-no question read well starting with `is`, `has` or `can`.\n\nA good function does one job. If you struggle to name it without the word \"and\", it's probably two functions. Small functions are easier to test, easier to reuse, and easier to fix, because when something breaks you know exactly which little piece to look at."
+    }
+   ],
+   "key_points": [
+    "`local function name(params) ... end` defines a function. Calling it with `name(args)` runs it.",
+    "A function must be defined above where it's first called.",
+    "Arguments match parameters by position. Missing ones become `nil`, extras are ignored.",
+    "Name functions after the one job they do."
+   ],
+   "mistakes": [
+    "Calling a function on a line above its definition.",
+    "Forgetting the brackets, so you refer to the function instead of calling it.",
+    "Passing arguments in the wrong order, since only position matters."
+   ],
+   "try_it": "Write a function that takes a customer's name and number of pizzas and prints an order line, then call it for three different customers. Call it once with only a name and see what the missing argument becomes.",
+   "quiz": [
+    {
+     "question": "What happens when this runs? `local function shout() print(\"Hey\") end` and nothing else.",
+     "choices": [
+      "It prints `Hey` once",
+      "It prints nothing, because the function is defined but never called",
+      "It errors",
+      "It prints `shout`"
+     ],
+     "answer": 1,
+     "explain": "Defining a function stores it. Only calling it runs the code."
+    },
+    {
+     "question": "`local function order(a, b) print(a, b) end` then `order(1)`. What prints?",
+     "choices": [
+      "An error",
+      "`1`",
+      "`1 nil`",
+      "`1 1`"
+     ],
+     "answer": 2,
+     "explain": "The missing second argument becomes nil, and print shows it."
+    },
+    {
+     "question": "In `greet(\"Ana\")`, what is `\"Ana\"`?",
+     "choices": [
+      "A parameter",
+      "A return value",
+      "A global",
+      "An argument"
+     ],
+     "answer": 3,
+     "explain": "Values in a call are arguments. The names in the definition are parameters."
+    }
+   ]
+  },
+  {
+   "id": "ch05-l2",
+   "title": "Returning values",
+   "summary": "Getting results back from functions, returning several at once, and returning early.",
+   "minutes": 10,
+   "sections": [
+    {
+     "heading": "return",
+     "body": "Printing a result shows it to you, but the rest of your code can't use it. To hand a value back to whoever called the function, use `return`. The call then **becomes** that value, so you can store it, compare it or pass it straight into another function.\n\nA function without a `return` gives back nothing, which you'll see as `nil` if you try to use it. That's a very common bug: a function that prints its answer instead of returning it.",
+     "example": {
+      "caption": "Using a result",
+      "code": "local function tipFor(total)\n\treturn total * 0.1\nend\n\nlocal tip = tipFor(40)\nprint(\"Tip:\", tip)",
+      "explain": "tipFor(40) becomes 4, which is stored in tip and printed."
+     }
+    },
+    {
+     "heading": "return ends the function",
+     "body": "`return` stops the function immediately. Any lines after it in the same run are skipped. That makes it perfect for **guard clauses**: checks at the top that return early when something is wrong, so the main logic below can assume everything is fine.\n\nGuard clauses replace deep nesting. Instead of wrapping the whole function in an `if`, you handle the bad cases first and return, and the real work sits at the bottom with no extra indentation. Luau requires `return` to be the last statement in its block, which guard clauses naturally are.",
+     "example": {
+      "caption": "A guard clause",
+      "code": "local function slicesEach(slices, people)\n\tif people <= 0 then\n\t\treturn 0\n\tend\n\treturn slices // people\nend",
+      "explain": "Bad input is handled first, so the division below never divides by zero."
+     }
+    },
+    {
+     "heading": "Several return values",
+     "body": "A function can return more than one value, separated by commas, and the caller can catch them with several variables: two names on the left of the equals sign, the call on the right. Values are matched by position, and any extra variables get `nil`.\n\nThere's one quirk to know. A call returns all its values only when it's the **last** thing in a list. In the middle of a list, like the first argument of `print` followed by more arguments, it's cut down to its first value. So if a multi-value call seems to lose values, check whether it's last.",
+     "example": {
+      "caption": "Two answers at once",
+      "code": "local function split(total, people)\n\treturn total // people, total % people\nend\n\nlocal each, spare = split(17, 5)\nprint(each, spare)",
+      "explain": "Prints `3 2`: three each, with two left over."
+     }
+    },
+    {
+     "heading": "Returning booleans",
+     "body": "Functions that answer a question should return a real `true` or `false`. A comparison already is one, so return it directly: write `return minutes > 15` rather than an if that returns `true` in one branch and `false` in the other.\n\nBe careful with `and` and `or` here. Because they return one of their operands, a function ending with `return name and isPaid` can return `nil` or a string rather than a boolean. Usually that's fine in an `if`, but a test or another script expecting exactly `true` or `false` may disagree."
+    }
+   ],
+   "key_points": [
+    "`return` hands a value back to the caller, and the call becomes that value.",
+    "`return` ends the function immediately, which makes guard clauses possible.",
+    "Return several values with commas, and catch them with several variables.",
+    "Return comparisons directly for clean true or false answers."
+   ],
+   "mistakes": [
+    "Printing a result instead of returning it, so the caller gets `nil`.",
+    "Writing code after a return in the same block, which never runs.",
+    "Losing extra return values by putting the call in the middle of a list."
+   ],
+   "try_it": "Write a function that returns the bigger of two numbers, one that returns whether a number is even, and one that returns both the minutes and seconds in a number of seconds. Print what each returns for a few inputs, including a zero.",
+   "quiz": [
+    {
+     "question": "`local function f() print(5) end` then `local x = f()`. What is `x`?",
+     "choices": [
+      "`nil`",
+      "`5`",
+      "`\"5\"`",
+      "An error"
+     ],
+     "answer": 0,
+     "explain": "f prints 5 but returns nothing, so x is nil."
+    },
+    {
+     "question": "`local function f() return 1, 2 end` then `local a, b, c = f()`. What is `c`?",
+     "choices": [
+      "`2`",
+      "`1`",
+      "`nil`",
+      "An error"
+     ],
+     "answer": 2,
+     "explain": "f returns two values, so the third variable gets nil."
+    },
+    {
+     "question": "What's the main benefit of a guard clause?",
+     "choices": [
+      "It makes the function run faster",
+      "It lets you skip writing end",
+      "It hides errors from the Output window",
+      "Bad cases are handled early, so the main logic needs no nesting"
+     ],
+     "answer": 3,
+     "explain": "Returning early for bad input keeps the real work flat and readable."
+    }
+   ]
+  },
+  {
+   "id": "ch05-l3",
+   "title": "Scope",
+   "summary": "Where variables exist, why functions have their own locals, and what shadowing is.",
+   "minutes": 9,
+   "sections": [
+    {
+     "heading": "Blocks create scope",
+     "body": "A variable's **scope** is the part of the code where it exists. A `local` lives from the line it's declared until the end of the block it was declared in. Every `if`, loop, function and `do ... end` is a block, so a local made inside one disappears at its `end`.\n\nThis is a feature. It means a function's working variables can't leak out and collide with the rest of your script, and two different functions can both have a variable called `total` without interfering with each other.\n\nA good habit follows from this: declare each variable in the smallest block that needs it, as close as possible to where it's first used. A variable that only matters inside a loop should be declared inside the loop. The fewer lines that can see a variable, the fewer places a bug involving it can hide."
+    },
+    {
+     "heading": "Parameters are locals",
+     "body": "Parameters are local variables of the function, created fresh on every call. Changing a parameter inside the function doesn't change the variable the caller passed in. With numbers, strings and booleans, the function gets the value, not the caller's variable.\n\nTables behave differently, because a table is passed by reference: the function receives the same table, not a copy. You'll explore that properly in chapter 6.",
+     "example": {
+      "caption": "Changing a parameter",
+      "code": "local function addTip(total)\n\ttotal += 5\n\treturn total\nend\n\nlocal bill = 20\nlocal paid = addTip(bill)\nprint(bill, paid)",
+      "explain": "Prints `20 25`. The function changed its own total, not the caller's bill."
+     }
+    },
+    {
+     "heading": "Reaching outward",
+     "body": "Code can see variables from the blocks **around** it. A function defined inside a script can read and change the script's top-level locals, which is how a function updates a shared counter. The reverse doesn't work: the script can't see the function's locals.\n\nThis \"looking outward\" is the basis of closures, one of Luau's most powerful ideas, which you'll learn in chapter 8."
+    },
+    {
+     "heading": "Shadowing",
+     "body": "Declaring a `local` with the same name as one in an outer block creates a new variable that **shadows** the outer one: inside the inner block, the name refers to the new variable, and the outer one is hidden until the block ends.\n\nShadowing is legal, and occasionally handy, but accidental shadowing is a classic bug. You meant to update a counter, typed `local` out of habit, and created a temporary copy that vanishes at `end`, leaving the real counter unchanged. Studio's Script Analysis warns about many of these."
+    }
+   ],
+   "key_points": [
+    "A local exists from its declaration to the end of its block.",
+    "Parameters are locals, created fresh each call.",
+    "Inner code can see outer variables, but not the other way round.",
+    "A `local` with an existing name shadows the outer variable."
+   ],
+   "mistakes": [
+    "Using a variable after the block it was declared in has ended.",
+    "Writing `local` again when you meant to update an outer variable.",
+    "Expecting a function to change the caller's number by changing its parameter."
+   ],
+   "try_it": "Make a script-level counter and a function that adds one to it, call it three times and print the counter. Then add `local` in front of the update inside the function, run again, and work out why the counter stopped changing.",
+   "quiz": [
+    {
+     "question": "`if true then local x = 5 end print(x)`. What prints?",
+     "choices": [
+      "`5`",
+      "`nil`",
+      "An error",
+      "`true`"
+     ],
+     "answer": 1,
+     "explain": "x only exists inside the if block, so outside it the name is nil."
+    },
+    {
+     "question": "A function changes its number parameter. What happens to the caller's variable?",
+     "choices": [
+      "Nothing, the function changed its own copy",
+      "It changes too",
+      "It becomes nil",
+      "It errors"
+     ],
+     "answer": 0,
+     "explain": "Numbers are passed by value, so the parameter is a separate local."
+    },
+    {
+     "question": "Can a function read a local declared at the top of the same script, above the function?",
+     "choices": [
+      "No, functions can only see their parameters",
+      "Only if it's a global",
+      "Only numbers, not strings",
+      "Yes, inner code can see outer variables"
+     ],
+     "answer": 3,
+     "explain": "Code can see variables from the blocks around it."
+    }
+   ]
+  },
+  {
+   "id": "ch05-l4",
+   "title": "Functions as values",
+   "summary": "Storing and passing functions like any other value, recursion, and variable numbers of arguments.",
+   "minutes": 11,
+   "sections": [
+    {
+     "heading": "Functions are values",
+     "body": "In Luau, a function is a value like a number or a string. `local function greet()` is really shorthand for creating a function and storing it in the local `greet`. That means you can store functions in other variables, pass them to other functions, and return them.\n\nPassing a function as an argument is everywhere in Roblox. When you later connect an event, you hand Roblox a function and say \"call this when the event happens\". Those are often written right in the call, without a name, which is called an **anonymous function**.",
+     "example": {
+      "caption": "Passing a function in",
+      "code": "local function twice(action)\n\taction()\n\taction()\nend\n\ntwice(function()\n\tprint(\"Honk\")\nend)",
+      "explain": "Prints `Honk` twice. twice doesn't know what the action does, only that it can call it."
+     }
+    },
+    {
+     "heading": "Recursion",
+     "body": "A function can call itself. That's **recursion**, and it suits problems that contain smaller copies of themselves, like counting down (a countdown from 3 is \"say 3, then count down from 2\") or later, searching through folders inside folders.\n\nEvery recursive function needs a **base case** that stops it, usually a guard clause at the top. Without one it calls itself forever, until Luau gives up with a \"stack overflow\" error. Use `local function` for recursive functions, since that form lets the function see its own name inside itself."
+    },
+    {
+     "heading": "Variable numbers of arguments",
+     "body": "Sometimes a function should accept any number of arguments, like `print`. Write `...` (three dots) as the last parameter, and inside the function `...` stands for all the extra arguments. You can pass it on to another function, or count it with `select(\"#\", ...)`.\n\nTo loop over the values, put them in a list with curly brackets around the dots. You'll learn how lists work in the next chapter. For now, the numeric loop you know works with `select`: `select(i, ...)` gives the i-th extra argument onwards, and its first value is the one you want.",
+     "example": {
+      "caption": "Adding any number of prices",
+      "code": "local function total(...)\n\tlocal sum = 0\n\tfor i = 1, select(\"#\", ...) do\n\t\tsum += (select(i, ...))\n\tend\n\treturn sum\nend\nprint(total(12, 9.5, 3))",
+      "explain": "Prints `24.5`. The brackets around select keep only its first value."
+     }
+    },
+    {
+     "heading": "Why this matters",
+     "body": "Treating functions as values is what makes callbacks, events, sorting with custom rules and most of Roblox's API possible. It feels abstract now, but by chapter 8 you'll be writing functions that build and return other functions, and by chapter 11 you'll be handing functions to Roblox events dozens of times a day.\n\nThe key mental shift: a function name followed by brackets **runs** it; the name alone **is** it, a value you can pass around."
+    }
+   ],
+   "key_points": [
+    "Functions are values: store them, pass them, return them.",
+    "An anonymous function is written inline with `function(...) ... end`.",
+    "Recursive functions call themselves, and need a base case.",
+    "`...` collects extra arguments, and `select(\"#\", ...)` counts them."
+   ],
+   "mistakes": [
+    "Passing `doThing()` (the result) when you meant `doThing` (the function).",
+    "Writing recursion without a base case.",
+    "Forgetting that `...` must be the last parameter."
+   ],
+   "try_it": "Write a function that takes another function and a number, and calls the function that many times. Then write a recursive countdown that prints from a number down to 1. Finally, write a function that returns how many arguments it was given.",
+   "quiz": [
+    {
+     "question": "What's the difference between `run(save)` and `run(save())`?",
+     "choices": [
+      "The first passes the function itself, the second passes whatever it returns",
+      "None at all",
+      "The second is a syntax error",
+      "The first calls save twice"
+     ],
+     "answer": 0,
+     "explain": "With brackets, save runs first and its result is passed instead."
+    },
+    {
+     "question": "What does every recursive function need?",
+     "choices": [
+      "Three dots",
+      "A base case that stops it calling itself",
+      "A global variable",
+      "At least two parameters"
+     ],
+     "answer": 1,
+     "explain": "Without a base case it never stops, and Luau errors with a stack overflow."
+    },
+    {
+     "question": "`local function count(...) return select(\"#\", ...) end`. What is `count(\"a\", nil, 3)`?",
+     "choices": [
+      "`2`",
+      "`1`",
+      "An error",
+      "`3`"
+     ],
+     "answer": 3,
+     "explain": "select with # counts every argument passed, including nil."
+    }
+   ]
+  },
+  {
+   "id": "ch05-l5",
+   "title": "Your first ModuleScripts",
+   "summary": "Putting functions in a ModuleScript, requiring it from another script, and how require shares one copy.",
+   "minutes": 11,
+   "sections": [
+    {
+     "heading": "Sharing code between scripts",
+     "body": "Functions solve repetition inside one script. But what about two scripts that need the same function? Copying it into both means fixing every bug twice. A **ModuleScript** solves this: it holds code once, and any script can borrow it.\n\nA ModuleScript runs only when a script calls `require` on it, and it must **return exactly one value**. Almost always that value is a table holding functions, so the module acts like a toolbox other scripts can open."
+    },
+    {
+     "heading": "Writing a module",
+     "body": "Studio's new ModuleScript already contains the usual shape: a local table named after the module, and a `return` of that table at the bottom. You add functions to the table by writing `function`, the table's name, a dot, and the function's name.\n\nAnything you put in the table is **public**, visible to scripts that require the module. Local variables and local functions in the module stay **private**, usable inside the module but hidden from everyone else. That split lets a module hide its working parts and only expose what others should use.",
+     "example": {
+      "caption": "A small module",
+      "code": "local Oven = {}\nlocal maxPizzas = 4 -- private\n\nfunction Oven.canFit(count)\n\treturn count <= maxPizzas\nend\n\nreturn Oven",
+      "explain": "Other scripts can call Oven.canFit, but can't see or change maxPizzas."
+     }
+    },
+    {
+     "heading": "Requiring it",
+     "body": "In another script, call `require` with the ModuleScript instance, and store what it returns. Usually you find the module relative to the script: `script` is the script that's running, `script.Parent` is the folder it's in, and adding `.ModuleName` reaches a sibling. So a Script next to a module named `Oven` writes `require(script.Parent.Oven)`.\n\nThen you call the module's functions through the variable, with a dot: the module's name, a dot, and the function's name with its arguments."
+    },
+    {
+     "heading": "One shared copy",
+     "body": "The first `require` runs the module's code and remembers what it returned. Every later `require` of the same module, from any script on the same side (server or client), gets back that **same** table without running the module again. So a module is a natural place to keep state that several scripts share, like a counter of deliveries.\n\nThat also explains a common surprise: print statements at the top of a module run only once, however many scripts require it. And if the module errors while loading, every script that requires it gets an error too, so a broken module can stop several scripts at once."
+    }
+   ],
+   "key_points": [
+    "A ModuleScript runs when required, and must return exactly one value, usually a table.",
+    "Functions added to that table are public. Locals in the module are private.",
+    "`require(script.Parent.Name)` loads a sibling module.",
+    "Every require on the same side shares one copy of the module."
+   ],
+   "mistakes": [
+    "Forgetting the `return` at the bottom of the module.",
+    "Defining a function as `local function` and expecting other scripts to see it.",
+    "Expecting a module's top-level code to run again on each require."
+   ],
+   "try_it": "Make a ModuleScript with a private counter and two public functions, one that adds to the counter and one that returns it. Require it from two different Scripts, call the add function from both, and print the count from one of them to see the shared copy.",
+   "quiz": [
+    {
+     "question": "How many values must a ModuleScript return?",
+     "choices": [
+      "Any number",
+      "None",
+      "Exactly one",
+      "At least two"
+     ],
+     "answer": 2,
+     "explain": "require hands back one value, so the module must return exactly one."
+    },
+    {
+     "question": "Two scripts require the same module. How many times does the module's code run?",
+     "choices": [
+      "Once, and both get the same table",
+      "Twice, once per script",
+      "Only when a function is called",
+      "Once per player"
+     ],
+     "answer": 0,
+     "explain": "require caches the result, so later requires get the same value without rerunning the code."
+    },
+    {
+     "question": "Inside a module, `local function helper()` is defined but not added to the returned table. Can other scripts call it?",
+     "choices": [
+      "Yes, with `Module.helper()`",
+      "Yes, with `require(helper)`",
+      "Only from the client",
+      "No, it's private to the module"
+     ],
+     "answer": 3,
+     "explain": "Only what's in the returned table is visible to other scripts."
+    }
+   ]
+  }
+ ]
+}

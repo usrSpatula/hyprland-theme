@@ -1,0 +1,121 @@
+{
+ "title": "Python Course",
+ "try_heading": "TRY IT IN A TERMINAL",
+ "about_summary": "Lessons teach the ideas. Tests you write and run right here prove you can use them.",
+ "about": [
+  {
+   "heading": "Code right here",
+   "body": "Every test has an editor. Type your program there: it saves as you type, so you can close the panel and come back later. **Run** runs your program and shows what it prints, and **Check my work** marks the whole test.\n\nEverything runs on this computer with `python3`. Your code is also saved as files in `~/.config/waybar/learning-work/python`, if you ever want to open it in another editor."
+  },
+  {
+   "heading": "Lessons",
+   "body": "Each lesson explains one idea properly: what it is, why it works the way it does, and the mistakes people make with it. Examples show the syntax on a different problem from the test, so read them, then try your own version in a terminal.\n\nEvery lesson ends with three quick check questions. Get all three right to finish the lesson."
+  },
+  {
+   "heading": "Tests",
+   "body": "Each chapter ends with a test. The test page says exactly what your program must do and how it's checked, but never how to write it. Hints get stronger one at a time.\n\nTests feed your program input and check what it prints, so print exactly what's asked for, and don't pass a message to `input()`. Check as often as you like: each requirement gets a tick or a reason. Passing a chapter's test unlocks the next chapter."
+  },
+  {
+   "heading": "Daily review and your streak",
+   "body": "Once you've finished a lesson, Daily review gives you five questions from lessons you've done, different every day. Finishing a lesson or a review, or checking a test, counts as practice for the day."
+  },
+  {
+   "heading": "Trying things out",
+   "body": "Type `python3` in a terminal for the `>>>` prompt, where every line runs straight away. It's the fastest way to test an idea from a lesson. Press Ctrl+D to leave it."
+  }
+ ],
+ "chapters": [
+  {
+   "id": "py01",
+   "number": 1,
+   "title": "Your first programs",
+   "summary": "How Python runs, printing, strings, comments and reading errors.",
+   "lessons": [
+    "py01-l1",
+    "py01-l2",
+    "py01-l3"
+   ],
+   "test": "pytest01"
+  },
+  {
+   "id": "py02",
+   "number": 2,
+   "title": "Values and variables",
+   "summary": "Variables, numbers, strings, types, conversion and input.",
+   "lessons": [
+    "py02-l1",
+    "py02-l2",
+    "py02-l3",
+    "py02-l4"
+   ],
+   "test": "pytest02"
+  },
+  {
+   "id": "py03",
+   "number": 3,
+   "title": "Making decisions",
+   "summary": "if, elif and else, comparisons, and/or/not, truthiness and match.",
+   "lessons": [
+    "py03-l1",
+    "py03-l2",
+    "py03-l3"
+   ],
+   "test": "pytest03"
+  },
+  {
+   "id": "py04",
+   "number": 4,
+   "title": "Loops",
+   "summary": "for and range, while, break and continue, and the loop patterns you'll reuse forever.",
+   "lessons": [
+    "py04-l1",
+    "py04-l2",
+    "py04-l3"
+   ],
+   "test": "pytest04"
+  },
+  {
+   "id": "py05",
+   "number": 5,
+   "title": "Functions",
+   "summary": "def and return, parameters and defaults, scope, and writing functions well.",
+   "lessons": [
+    "py05-l1",
+    "py05-l2",
+    "py05-l3"
+   ],
+   "test": "pytest05"
+  },
+  {
+   "id": "py06",
+   "number": 6,
+   "title": "Lists and dictionaries",
+   "summary": "Lists, dictionaries, tuples, sets and comprehensions.",
+   "lessons": [
+    "py06-l1",
+    "py06-l2",
+    "py06-l3"
+   ],
+   "test": "pytest06"
+  },
+  {
+   "id": "py07",
+   "number": 7,
+   "title": "Errors, files, classes and modules",
+   "summary": "Exceptions, files, classes and objects, and the standard library.",
+   "lessons": [
+    "py07-l1",
+    "py07-l2",
+    "py07-l3",
+    "py07-l4"
+   ],
+   "test": "pytest07"
+  }
+ ],
+ "final": {
+  "title": "Final project",
+  "tests": [
+   "pyfinal1"
+  ]
+ }
+}

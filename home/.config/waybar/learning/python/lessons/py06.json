@@ -1,0 +1,242 @@
+{
+ "chapter": "py06",
+ "lessons": [
+  {
+   "id": "py06-l1",
+   "title": "Lists",
+   "summary": "Ordered collections: indexing, changing, adding, removing, sorting and looping.",
+   "minutes": 13,
+   "sections": [
+    {
+     "heading": "Many values under one name",
+     "body": "A **list** holds any number of values, in order, inside square brackets: `toppings = [\"cheese\", \"ham\", \"olives\"]`. Lists can hold any type, mixed, and even other lists. `[]` is an empty list.\n\nLists use the same **indexing** and **slicing** as strings: `toppings[0]` is the first item, `toppings[-1]` the last, `toppings[1:]` everything but the first. `len(toppings)` is how many items there are, and `\"ham\" in toppings` checks membership."
+    },
+    {
+     "heading": "Lists can change",
+     "body": "Unlike strings, lists are **mutable**: you can change them in place. Assign to an index to replace an item. These methods change the list itself:",
+     "example": {
+      "code": "orders = [\"margherita\", \"pepperoni\"]\norders.append(\"veggie\")\norders[0] = \"hawaiian\"\nfirst = orders.pop(0)\nprint(first, orders, len(orders))",
+      "explain": "Prints `hawaiian ['pepperoni', 'veggie'] 2`."
+     },
+     "bullets": [
+      "`.append(x)`: add x to the end. The most-used one by far.",
+      "`.insert(i, x)`: add x at position i.",
+      "`.remove(x)`: remove the first x (ValueError if it's not there).",
+      "`.pop()`: remove and return the last item; `.pop(i)` the one at i.",
+      "`.sort()`: sort in place. `sorted(lst)` returns a new sorted list instead, leaving the original alone.",
+      "`.reverse()`, `.count(x)`, `.index(x)`."
+     ]
+    },
+    {
+     "heading": "Looping and building",
+     "body": "`for item in some_list:` goes through each item. To build a new list, start with `[]` and `.append` in a loop. Built-in functions `sum`, `min`, `max` and `len` work directly on lists of numbers.\n\nCareful: the methods that change a list return `None`. `orders = orders.sort()` sorts it and then throws it away, leaving `orders` as None. Either call `orders.sort()` on its own line, or use `orders = sorted(orders)`.",
+     "example": {
+      "code": "prices = [8.5, 12.0, 9.25]\ncheap = []\nfor price in prices:\n    if price < 10:\n        cheap.append(price)\nprint(cheap, sum(prices), max(prices))"
+     }
+    },
+    {
+     "heading": "Two names, one list",
+     "body": "Assigning a list to another name doesn't copy it: `b = a` makes both names refer to the **same** list, so changing it through one name shows through the other. Use `b = a.copy()` or `b = a[:]` when you want a separate copy. This is the cause of many confusing bugs, so it's worth remembering."
+    }
+   ],
+   "key_points": [
+    "`[a, b, c]` is a list; index and slice like strings.",
+    "Lists are mutable: `.append`, `.insert`, `.remove`, `.pop`, assigning to an index.",
+    "`.sort()` changes the list and returns None; `sorted()` returns a new one.",
+    "`b = a` shares the list; `a.copy()` makes a separate one."
+   ],
+   "mistakes": [
+    "Writing `items = items.append(x)`, which sets items to None.",
+    "Indexing past the end, which is an IndexError.",
+    "Changing a list through one name and being surprised it changed through another."
+   ],
+   "try_it": "Make a list of five numbers. Append one, remove one, sort it, and print the smallest, largest and total. Make `b = a`, append to b, and print a to see the sharing for yourself.",
+   "quiz": [
+    {
+     "question": "What's `[\"a\", \"b\", \"c\"][-2]`?",
+     "choices": [
+      "`\"a\"`",
+      "`\"b\"`",
+      "`\"c\"`",
+      "An error"
+     ],
+     "answer": 1,
+     "explain": "-1 is the last item and -2 the one before it."
+    },
+    {
+     "question": "After `x = [3, 1, 2]` and `x = x.sort()`, what's x?",
+     "choices": [
+      "`[1, 2, 3]`",
+      "`[3, 1, 2]`",
+      "`None`",
+      "An error"
+     ],
+     "answer": 2,
+     "explain": "sort changes the list and returns None, which then gets assigned to x."
+    },
+    {
+     "question": "`a = [1]`, `b = a`, `b.append(2)`. What's a?",
+     "choices": [
+      "`[1]`",
+      "`[1, 2]`",
+      "`[2]`",
+      "`None`"
+     ],
+     "answer": 1,
+     "explain": "a and b are the same list, so appending through b changes it for a too."
+    }
+   ]
+  },
+  {
+   "id": "py06-l2",
+   "title": "Dictionaries",
+   "summary": "Looking things up by key: adding, reading safely, looping and counting.",
+   "minutes": 13,
+   "sections": [
+    {
+     "heading": "Values stored by name",
+     "body": "A **dictionary** (dict) stores **key-value pairs**: you look a value up by its key instead of by position. It's written with curly brackets, a colon between each key and value, and commas between pairs. Keys are usually strings or numbers and must be unique.",
+     "example": {
+      "code": "menu = {\"margherita\": 8.5, \"pepperoni\": 9.75, \"veggie\": 9.0}\nprint(menu[\"pepperoni\"])\nmenu[\"hawaiian\"] = 10.25\nmenu[\"veggie\"] = 8.75\nprint(len(menu), \"pizzas on the menu\")",
+      "explain": "Assigning to a new key adds it; assigning to an existing key replaces its value."
+     }
+    },
+    {
+     "heading": "Reading safely",
+     "body": "Reading a key that isn't there, like `menu[\"calzone\"]`, raises a `KeyError`. Two ways to avoid it: check first with `if \"calzone\" in menu:` (which checks keys), or use `.get`: `menu.get(\"calzone\")` gives `None` if it's missing, and `menu.get(\"calzone\", 0)` gives the default you choose.\n\n`del menu[\"veggie\"]` removes a pair, and `.pop(key)` removes it and returns its value."
+    },
+    {
+     "heading": "Looping over a dictionary",
+     "body": "`for key in menu:` loops over the keys. `.values()` gives just the values, and `.items()` gives key and value together, which you unpack in the loop: `for name, price in menu.items():`. Dictionaries remember the order keys were added in."
+    },
+    {
+     "heading": "The counting pattern",
+     "body": "One of the most useful patterns in programming: counting how many times each thing appears. Loop through the things, and for each one, add 1 to its count in a dictionary, starting from 0 if it isn't there yet. `.get(key, 0) + 1` does exactly that.",
+     "example": {
+      "code": "orders = [\"veggie\", \"pepperoni\", \"veggie\", \"margherita\", \"veggie\"]\ncounts = {}\nfor pizza in orders:\n    counts[pizza] = counts.get(pizza, 0) + 1\nprint(counts)\nbest = max(counts, key=counts.get)\nprint(best)",
+      "explain": "Prints `{'veggie': 3, 'pepperoni': 1, 'margherita': 1}` then `veggie`. `max` with `key=counts.get` picks the key with the biggest count."
+     }
+    }
+   ],
+   "key_points": [
+    "`{key: value}` maps keys to values; `d[key]` reads, `d[key] = v` sets.",
+    "Missing keys raise KeyError. Use `in` or `.get(key, default)`.",
+    "`.items()` loops over keys and values together.",
+    "Count with `d[x] = d.get(x, 0) + 1`."
+   ],
+   "mistakes": [
+    "Reading a missing key with square brackets.",
+    "Expecting `x in d` to search the values. It checks keys.",
+    "Changing a dictionary's size while looping over it."
+   ],
+   "try_it": "Make a dictionary of three friends' names and ages. Add a fourth, change one age, and print each name and age with `.items()`. Count the letters in your name with the counting pattern.",
+   "quiz": [
+    {
+     "question": "What does `{\"a\": 1}.get(\"b\", 0)` give?",
+     "choices": [
+      "`None`",
+      "`0`",
+      "KeyError",
+      "`1`"
+     ],
+     "answer": 1,
+     "explain": "b isn't a key, so get returns the default you gave, 0."
+    },
+    {
+     "question": "With `d = {\"x\": 5}`, what's `5 in d`?",
+     "choices": [
+      "True",
+      "False"
+     ],
+     "answer": 1,
+     "explain": "in checks the keys, not the values. Use `5 in d.values()` for values."
+    },
+    {
+     "question": "What does `d[\"k\"] = d.get(\"k\", 0) + 1` do the first time, when k isn't in d?",
+     "choices": [
+      "KeyError",
+      "Sets d[\"k\"] to 1",
+      "Sets d[\"k\"] to 0",
+      "Nothing"
+     ],
+     "answer": 1,
+     "explain": "get gives 0 because k is missing, plus 1 makes 1."
+    }
+   ]
+  },
+  {
+   "id": "py06-l3",
+   "title": "Tuples, sets and comprehensions",
+   "summary": "Fixed pairs, collections without duplicates, and building lists in one line.",
+   "minutes": 12,
+   "sections": [
+    {
+     "heading": "Tuples",
+     "body": "A **tuple** is like a list that can't be changed: `point = (3, 4)`. Use tuples for small fixed groups of values that belong together, like coordinates, or a name and a score. You've already used them: `return a, b` returns a tuple, and `for name, price in menu.items()` unpacks one each iteration.\n\nBecause they can't change, tuples can be dictionary keys and set items, which lists can't."
+    },
+    {
+     "heading": "Sets",
+     "body": "A **set** holds unique values with no order: `{\"cheese\", \"ham\"}`, or `set()` for an empty one (`{}` is an empty dict). Adding something that's already there does nothing, so `set(a_list)` removes duplicates.\n\nChecking `x in a_set` is very fast, even for huge sets. Sets also do maths: `a | b` (everything in either), `a & b` (only in both) and `a - b` (in a but not b).",
+     "example": {
+      "code": "mine = {\"cheese\", \"ham\", \"olives\"}\nyours = {\"cheese\", \"peppers\"}\nprint(mine & yours)\nprint(sorted(mine | yours))\nprint(len(set([\"a\", \"b\", \"a\", \"a\"])))",
+      "explain": "Prints `{'cheese'}`, then all four toppings in order, then `2`."
+     }
+    },
+    {
+     "heading": "Comprehensions",
+     "body": "A **list comprehension** builds a new list from another sequence in one line: `[expression for item in sequence]`, optionally with `if condition` at the end to keep only some items. It does the same job as an empty list plus a for loop with append, more compactly.\n\nThere are dict and set versions too: `{key: value for ...}` and `{value for ...}`. Keep them simple; if a comprehension needs nested loops and several conditions, a normal loop is clearer.",
+     "example": {
+      "code": "prices = [8.5, 12.0, 9.25, 15.0]\nwith_tax = [round(p * 1.2, 2) for p in prices]\ncheap = [p for p in prices if p < 10]\nlengths = {word: len(word) for word in [\"ham\", \"olives\"]}\nprint(with_tax, cheap, lengths)"
+     }
+    }
+   ],
+   "key_points": [
+    "Tuples `(a, b)` are fixed groups; they unpack into names.",
+    "Sets hold unique values; `set(list)` removes duplicates; `&`, `|`, `-` compare sets.",
+    "`[expr for x in seq if cond]` builds a list in one line.",
+    "Use a normal loop when a comprehension gets complicated."
+   ],
+   "mistakes": [
+    "Writing `{}` for an empty set (it's a dict; use `set()`).",
+    "Trying to change a tuple, which is a TypeError.",
+    "Comprehensions so long they need scrolling."
+   ],
+   "try_it": "Turn a list with duplicates into a sorted list of unique values. Use a comprehension to make a list of the squares of 1 to 10, then only the even squares.",
+   "quiz": [
+    {
+     "question": "What's `[n * 2 for n in range(4)]`?",
+     "choices": [
+      "`[2, 4, 6, 8]`",
+      "`[0, 2, 4, 6]`",
+      "`[0, 1, 2, 3]`",
+      "`8`"
+     ],
+     "answer": 1,
+     "explain": "range(4) is 0 to 3, each doubled."
+    },
+    {
+     "question": "What's `len({1, 2, 2, 3, 3, 3})`?",
+     "choices": [
+      "6",
+      "3",
+      "1",
+      "An error"
+     ],
+     "answer": 1,
+     "explain": "A set keeps each value once: 1, 2 and 3."
+    },
+    {
+     "question": "What does `{}` create?",
+     "choices": [
+      "An empty set",
+      "An empty dict",
+      "An empty tuple",
+      "An error"
+     ],
+     "answer": 1,
+     "explain": "Empty curly brackets make a dict. An empty set is `set()`."
+    }
+   ]
+  }
+ ]
+}

@@ -1,0 +1,318 @@
+{
+ "chapter": "py07",
+ "lessons": [
+  {
+   "id": "py07-l1",
+   "title": "Handling errors",
+   "summary": "try and except, catching the right error, else and finally, and raising your own.",
+   "minutes": 13,
+   "sections": [
+    {
+     "heading": "Errors you expect",
+     "body": "Some errors aren't bugs; they're things that can genuinely happen. A user types `ten` when you asked for a number. A file isn't where it should be. Instead of letting the program crash, you can **handle** the error with `try` and `except`.\n\nPython runs the `try` block. If an error happens inside it, Python jumps straight to the matching `except` block instead of crashing. If no error happens, the except block is skipped.",
+     "example": {
+      "code": "text = \"ten\"\ntry:\n    number = int(text)\n    print(\"Got\", number)\nexcept ValueError:\n    print(\"That isn't a whole number\")",
+      "explain": "int(\"ten\") raises a ValueError, so `Got` never prints and the except block runs."
+     }
+    },
+    {
+     "heading": "Catch the specific error",
+     "body": "Always name the error type you expect, like `except ValueError:`. A bare `except:` catches **everything**, including typos in your own code (a NameError) and even Ctrl+C, which hides real bugs. You can catch several types with `except (ValueError, ZeroDivisionError):`, and get the error's message with `except ValueError as error:`.\n\nKeep the try block small: just the line that might fail. The less it contains, the less chance of catching something you didn't mean to."
+    },
+    {
+     "heading": "else and finally",
+     "body": "An `else:` block after the excepts runs only if **no** error happened, which keeps the try block small. A `finally:` block runs **no matter what**, error or not, which is used for clean-up like closing things."
+    },
+    {
+     "heading": "Raising errors",
+     "body": "Your own functions can raise errors with `raise`, to refuse bad input loudly rather than return a wrong answer. Pick a fitting built-in type: `ValueError` for a bad value, `TypeError` for a wrong type. Whoever calls your function can catch it.",
+     "example": {
+      "code": "def take_slices(available, wanted):\n    if wanted > available:\n        raise ValueError(f\"Only {available} slices left\")\n    return available - wanted\n\ntry:\n    left = take_slices(3, 5)\nexcept ValueError as error:\n    print(\"Order refused:\", error)",
+      "explain": "Prints `Order refused: Only 3 slices left`."
+     }
+    }
+   ],
+   "key_points": [
+    "`try:` runs code; `except SomeError:` runs if that error happens.",
+    "Name the specific error. Bare `except:` hides bugs.",
+    "`else` runs when nothing failed; `finally` always runs.",
+    "`raise ValueError(\"message\")` refuses bad input from your own functions."
+   ],
+   "mistakes": [
+    "Using bare `except:` and silently hiding a typo.",
+    "Wrapping the whole program in one giant try.",
+    "Returning a made-up value like -1 instead of raising an error."
+   ],
+   "try_it": "Write a loop that keeps asking for a number with `input()` until it gets a valid one, using try and except ValueError. Write a function that raises ValueError for negative ages and call it inside try.",
+   "quiz": [
+    {
+     "question": "What does `try: int(\"x\")` / `except ValueError: print(\"bad\")` print?",
+     "choices": [
+      "Nothing",
+      "`bad`",
+      "A ValueError traceback",
+      "`x`"
+     ],
+     "answer": 1,
+     "explain": "int(\"x\") raises ValueError, which the except catches."
+    },
+    {
+     "question": "Why avoid a bare `except:`?",
+     "choices": [
+      "It's slower",
+      "It catches every error, hiding real bugs",
+      "It's not valid Python",
+      "It only catches ValueError"
+     ],
+     "answer": 1,
+     "explain": "It catches everything, including mistakes in your own code that you'd want to see."
+    },
+    {
+     "question": "When does a `finally` block run?",
+     "choices": [
+      "Only if there was an error",
+      "Only if there wasn't",
+      "Always",
+      "Never"
+     ],
+     "answer": 2,
+     "explain": "finally runs whether or not an error happened."
+    }
+   ]
+  },
+  {
+   "id": "py07-l2",
+   "title": "Reading and writing files",
+   "summary": "Opening files with with, reading lines, writing and appending, and paths.",
+   "minutes": 12,
+   "sections": [
+    {
+     "heading": "Opening a file",
+     "body": "`open(path, mode)` opens a file. The mode says what you'll do: `\"r\"` read (the default), `\"w\"` write (which **empties the file first**, or creates it), and `\"a\"` append (adds to the end). Text files should also say their encoding, `encoding=\"utf-8\"`, so special characters like £ work everywhere.\n\nAlways open files with a `with` block. When the block ends, Python closes the file for you, even if an error happened inside. Forgetting to close files can lose data that hadn't been written yet.",
+     "example": {
+      "code": "with open(\"orders.txt\", \"w\", encoding=\"utf-8\") as file:\n    file.write(\"margherita\\n\")\n    file.write(\"pepperoni\\n\")\n\nwith open(\"orders.txt\", encoding=\"utf-8\") as file:\n    for line in file:\n        print(line.strip())",
+      "explain": "write doesn't add new lines for you, so include `\\n`. Looping over a file gives one line at a time, each ending in `\\n`, which strip removes."
+     }
+    },
+    {
+     "heading": "Reading all at once",
+     "body": "`file.read()` gives the whole file as one string. `file.read().splitlines()` gives a list of lines without the `\\n`s, which is often the most convenient form.\n\nIf the file doesn't exist, opening it for reading raises `FileNotFoundError`, which you can catch with try/except."
+    },
+    {
+     "heading": "Paths",
+     "body": "A path like `\"orders.txt\"` is **relative**: it means \"in the current folder\", which is wherever the program was started from, not necessarily where the script lives. The `pathlib` module makes paths easier: `Path.home() / \"notes.txt\"` builds a path in your home folder, and `Path(\"orders.txt\").read_text()` reads a whole file in one call.",
+     "example": {
+      "code": "from pathlib import Path\n\nnotes = Path(\"notes.txt\")\nnotes.write_text(\"Buy flour\\n\", encoding=\"utf-8\")\nprint(notes.exists(), notes.read_text(encoding=\"utf-8\").strip())"
+     }
+    }
+   ],
+   "key_points": [
+    "Use `with open(path, mode, encoding=\"utf-8\") as file:` so files always close.",
+    "`\"w\"` empties the file first; `\"a\"` appends; `\"r\"` reads.",
+    "Looping over a file gives lines with `\\n`; strip them.",
+    "`pathlib.Path` makes building and reading paths simpler."
+   ],
+   "mistakes": [
+    "Opening with `\"w\"` when you meant `\"a\"`, wiping the file.",
+    "Forgetting `\\n` when writing lines, so everything ends up on one line.",
+    "Assuming the current folder is the script's folder."
+   ],
+   "try_it": "Write a script that appends whatever you type into `input()` to a file called `log.txt`, then prints every line in the file with a line number.",
+   "quiz": [
+    {
+     "question": "What does opening an existing file with mode `\"w\"` do?",
+     "choices": [
+      "Adds to the end",
+      "Empties it first",
+      "Raises an error",
+      "Opens it read-only"
+     ],
+     "answer": 1,
+     "explain": "w truncates the file to nothing before you write."
+    },
+    {
+     "question": "Why use `with open(...) as file:`?",
+     "choices": [
+      "It's faster",
+      "It closes the file automatically, even after an error",
+      "It's the only way to read",
+      "It reads the whole file"
+     ],
+     "answer": 1,
+     "explain": "The with block guarantees the file is closed when it ends."
+    },
+    {
+     "question": "What does `file.write(\"hi\")` add?",
+     "choices": [
+      "`hi` and a new line",
+      "Just `hi`",
+      "`\"hi\"` with the quotes",
+      "Nothing until you print"
+     ],
+     "answer": 1,
+     "explain": "write adds exactly the text given. Add `\\n` yourself for a new line."
+    }
+   ]
+  },
+  {
+   "id": "py07-l3",
+   "title": "Classes and objects",
+   "summary": "Making your own types: __init__, attributes, methods, self and __str__.",
+   "minutes": 14,
+   "sections": [
+    {
+     "heading": "Bundling data with behaviour",
+     "body": "A **class** is a blueprint for making your own kind of value. Each value made from it is an **object** (or **instance**). Objects hold their own data, in **attributes**, and have their own functions, called **methods**. You've used plenty already: every string is an object of class `str`, and `.upper()` is one of its methods.\n\nClasses are useful when several values belong together and some functions only make sense on them: an order has items, a customer and a status, and you can add an item to it or work out its total."
+    },
+    {
+     "heading": "__init__ and self",
+     "body": "`__init__` is a special method that runs when you create an object, to set up its attributes. Its first parameter, `self`, is the object being created. Inside any method, `self` is the object the method was called on, and `self.name = value` stores an attribute on it.\n\nYou create an object by calling the class like a function: `Order(\"Ana\")`. Python makes a new object and passes it to `__init__` as `self`, along with your arguments. You never pass `self` yourself.",
+     "example": {
+      "code": "class Order:\n    def __init__(self, customer):\n        self.customer = customer\n        self.items = []\n\n    def add(self, item, price):\n        self.items.append((item, price))\n\n    def total(self):\n        return sum(price for _, price in self.items)\n\norder = Order(\"Ana\")\norder.add(\"margherita\", 8.5)\norder.add(\"cola\", 1.5)\nprint(order.customer, len(order.items), order.total())",
+      "explain": "Prints `Ana 2 10.0`. Each Order has its own list of items."
+     }
+    },
+    {
+     "heading": "__str__ and good design",
+     "body": "`__str__` is another special method: it returns the text shown when the object is printed or put in an f-string. Without it, printing shows something like `<__main__.Order object at 0x7f...>`.\n\nGood methods keep the object's data valid. Rather than letting other code change `order.items` directly in strange ways, provide methods like `add` and `remove` that check their input, and raise errors when something isn't allowed.",
+     "example": {
+      "code": "class Pizza:\n    def __init__(self, name, price):\n        if price <= 0:\n            raise ValueError(\"Price must be positive\")\n        self.name = name\n        self.price = price\n\n    def __str__(self):\n        return f\"{self.name} (£{self.price:.2f})\"\n\nprint(Pizza(\"veggie\", 9))",
+      "explain": "Prints `veggie (£9.00)`."
+     }
+    }
+   ],
+   "key_points": [
+    "A class is a blueprint; calling it makes an object.",
+    "`__init__(self, ...)` sets up attributes with `self.name = value`.",
+    "Methods take `self` first; call them as `obj.method(args)`.",
+    "`__str__` controls how an object prints."
+   ],
+   "mistakes": [
+    "Forgetting `self` as a method's first parameter.",
+    "Writing `items = []` instead of `self.items = []` in `__init__`, so it's lost.",
+    "Defining a list as a class-level attribute, which every object then shares."
+   ],
+   "try_it": "Write a `Counter` class with a `count` attribute starting at 0, an `increase(amount=1)` method, a `reset()` method and a `__str__`. Make two counters and show they count separately.",
+   "quiz": [
+    {
+     "question": "What is `self` inside a method?",
+     "choices": [
+      "The class",
+      "The object the method was called on",
+      "A keyword you must type in calls",
+      "The method itself"
+     ],
+     "answer": 1,
+     "explain": "self is the particular object, so each object keeps its own attributes."
+    },
+    {
+     "question": "What runs when you write `Order(\"Ana\")`?",
+     "choices": [
+      "`__str__`",
+      "`__init__`",
+      "Nothing until you call a method",
+      "`total`"
+     ],
+     "answer": 1,
+     "explain": "Creating an object calls __init__ to set it up."
+    },
+    {
+     "question": "What does `__str__` decide?",
+     "choices": [
+      "The object's attributes",
+      "What printing the object shows",
+      "How to compare objects",
+      "The class name"
+     ],
+     "answer": 1,
+     "explain": "print and f-strings use the text __str__ returns."
+    }
+   ]
+  },
+  {
+   "id": "py07-l4",
+   "title": "Modules and the standard library",
+   "summary": "import, from, writing your own modules, and the most useful built-in modules.",
+   "minutes": 11,
+   "sections": [
+    {
+     "heading": "import",
+     "body": "A **module** is a file of Python code you can use from another file. `import math` gives you the `math` module, and you use what's inside with a dot: `math.sqrt(16)`. `from math import sqrt, pi` brings specific names in directly, so you can write `sqrt(16)`.\n\nAny `.py` file is a module. If you have `prices.py` in the same folder, `import prices` lets you use its functions as `prices.pizza_price(...)`."
+    },
+    {
+     "heading": "if __name__ == \"__main__\"",
+     "body": "When a file is imported, all of its top-level code runs. That's a problem if it also has code that reads input or prints. The fix is a special check: code inside `if __name__ == \"__main__\":` runs only when the file is run directly, not when it's imported. It's how you write a file that's both a useful module and a runnable program.",
+     "example": {
+      "code": "def slices(pizzas):\n    return pizzas * 8\n\nif __name__ == \"__main__\":\n    print(slices(int(input())))"
+     }
+    },
+    {
+     "heading": "The standard library",
+     "body": "Python comes with a huge **standard library**, so you rarely start from scratch. Some you'll use often:",
+     "example": {
+      "code": "import json\nimport random\nfrom collections import Counter\n\nprint(random.choice([\"ham\", \"olives\", \"peppers\"]))\nprint(Counter(\"pepperoni\").most_common(1))\nprint(json.dumps({\"pizza\": \"veggie\", \"slices\": 8}))"
+     },
+     "bullets": [
+      "`math`: `sqrt`, `floor`, `ceil`, `pi` and more.",
+      "`random`: `random.randint(1, 6)`, `random.choice(list)`, `random.shuffle(list)`.",
+      "`datetime`: dates and times, like `datetime.date.today()`.",
+      "`json`: turn dicts and lists into text and back (`json.dumps`, `json.loads`), for saving data and talking to websites.",
+      "`pathlib` and `os`: files and folders.",
+      "`collections.Counter`: the counting pattern, done for you."
+     ]
+    },
+    {
+     "heading": "Installing more",
+     "body": "Beyond the standard library, thousands of packages exist on PyPI, installed with `pip`. On Arch, prefer `sudo pacman -S python-<name>` where a package exists, or create a **virtual environment** for each project with `python3 -m venv .venv`, so projects don't interfere with each other or with the system."
+    }
+   ],
+   "key_points": [
+    "`import module` then `module.name`; `from module import name` for direct use.",
+    "Any .py file is a module you can import.",
+    "Put a program's top-level actions under `if __name__ == \"__main__\":`.",
+    "Check the standard library (math, random, json, datetime, collections) before writing your own."
+   ],
+   "mistakes": [
+    "Naming your own file `random.py` or `json.py`, which hides the real module.",
+    "Top-level prints in a module that run every time it's imported.",
+    "Installing packages system-wide with pip instead of using pacman or a venv."
+   ],
+   "try_it": "In the prompt, try `import random` and roll a die ten times. Use `collections.Counter` to count the letters in a sentence. Turn a dictionary into JSON text and back with `json.dumps` and `json.loads`.",
+   "quiz": [
+    {
+     "question": "After `from math import sqrt`, how do you call it?",
+     "choices": [
+      "`math.sqrt(9)`",
+      "`sqrt(9)`",
+      "`math(sqrt(9))`",
+      "`import sqrt(9)`"
+     ],
+     "answer": 1,
+     "explain": "from-import brings the name in directly."
+    },
+    {
+     "question": "What does `if __name__ == \"__main__\":` protect?",
+     "choices": [
+      "Code that should only run when the file is run directly, not imported",
+      "Code from errors",
+      "Private functions",
+      "Nothing"
+     ],
+     "answer": 0,
+     "explain": "When imported, __name__ is the module's name, so the block is skipped."
+    },
+    {
+     "question": "Why is naming your script `random.py` a problem?",
+     "choices": [
+      "It's a reserved word",
+      "`import random` would find your file instead of the real module",
+      "Files can't be called that",
+      "It isn't"
+     ],
+     "answer": 1,
+     "explain": "Python looks in the script's folder first, so your file hides the standard one."
+    }
+   ]
+  }
+ ]
+}

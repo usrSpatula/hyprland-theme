@@ -1,0 +1,246 @@
+{
+ "chapter": "py01",
+ "lessons": [
+  {
+   "id": "py01-l1",
+   "title": "What Python is, and how it runs",
+   "summary": "Interpreters, the Python prompt, running a file, and your first print.",
+   "minutes": 9,
+   "sections": [
+    {
+     "heading": "A language that reads like instructions",
+     "body": "Python is a **programming language**: a precise way of writing instructions that a computer can follow. It was designed to be readable, so a lot of Python looks close to plain English. That's why it's used for everything from quick automation scripts to data science, web servers, Discord bots and the tools inside games studios.\n\nPython is an **interpreted** language. You don't compile it into an app first. Instead, a program called the **Python interpreter** (the `python3` command) reads your code from top to bottom and carries out each line as it goes. If line 5 has a mistake, lines 1 to 4 still run first."
+    },
+    {
+     "heading": "Two ways to run Python",
+     "body": "The first is the **interactive prompt**. Type `python3` in a terminal and you get a `>>>` prompt. Every line you type runs straight away and shows its result. It's perfect for trying an idea in a few seconds. Type `exit()` or press Ctrl+D to leave.\n\nThe second is a **script**: a file ending in `.py` that holds a whole program. You run it with `python3 name.py`. Scripts are how real programs are written, and they're what this course's tests use. In the test editor, **Run** does exactly this with your file.",
+     "example": {
+      "code": "$ python3\n>>> 2 + 3\n5\n>>> print(\"hello\")\nhello\n>>> exit()",
+      "caption": "The interactive prompt shows each result immediately:"
+     }
+    },
+    {
+     "heading": "print shows things",
+     "body": "`print` is a **function**: a named piece of behaviour you use by writing its name followed by round brackets. Whatever you put inside the brackets is what it shows, followed by a new line.\n\nText has to go in quotes, so Python knows it's text and not code. Numbers and sums don't, and Python works them out before printing. That difference matters: `print(\"6 * 8\")` prints the characters `6 * 8`, while `print(6 * 8)` prints `48`.",
+     "example": {
+      "code": "print(\"Shop open\")\nprint(6 * 8)\nprint(\"6 * 8\")",
+      "caption": "Text in quotes is printed as-is. A sum without quotes is worked out first:",
+      "explain": "This prints `Shop open`, then `48`, then `6 * 8`."
+     }
+    },
+    {
+     "heading": "Top to bottom",
+     "body": "A script runs one line at a time, from the first line to the last, unless you tell it otherwise (you'll learn loops and functions later). The order you write lines in is the order things happen. When the last line has run, the program ends."
+    }
+   ],
+   "key_points": [
+    "The `python3` command is the interpreter: it reads your code and runs it line by line.",
+    "The `>>>` prompt is for quick experiments; `.py` files hold whole programs.",
+    "`print(...)` shows a value. Text goes in quotes, sums don't.",
+    "Scripts run top to bottom, in the order you wrote them."
+   ],
+   "mistakes": [
+    "Typing `python3 file.py` inside the `>>>` prompt. That's a terminal command, not Python.",
+    "Forgetting the quotes around text, so Python looks for a variable with that name.",
+    "Expecting `print(\"2 + 2\")` to print 4. The quotes make it text."
+   ],
+   "try_it": "Open a terminal and type `python3`. Try `print(\"hi\")`, then a few sums like `7 * 6` and `10 / 4`. Then make a file called `hello.py` with two `print` lines and run it with `python3 hello.py`.",
+   "quiz": [
+    {
+     "question": "What does `print(3 + 4)` show?",
+     "choices": [
+      "`3 + 4`",
+      "`7`",
+      "`34`",
+      "An error"
+     ],
+     "answer": 1,
+     "explain": "Without quotes, Python works out the sum first and prints the result."
+    },
+    {
+     "question": "What does `print(\"3 + 4\")` show?",
+     "choices": [
+      "`7`",
+      "`3 + 4`",
+      "`\"3 + 4\"`",
+      "Nothing"
+     ],
+     "answer": 1,
+     "explain": "The quotes make it text, so it's printed exactly as written, without the quotes."
+    },
+    {
+     "question": "A script has an error on line 5. What happens to lines 1 to 4?",
+     "choices": [
+      "They don't run either",
+      "They run first, then the error stops it",
+      "Python skips line 5 and carries on",
+      "Python fixes line 5"
+     ],
+     "answer": 1,
+     "explain": "Python runs line by line, so everything before the error has already happened."
+    }
+   ]
+  },
+  {
+   "id": "py01-l2",
+   "title": "Text, print options and comments",
+   "summary": "Strings, quotes, escapes, print's sep and end, and writing good comments.",
+   "minutes": 10,
+   "sections": [
+    {
+     "heading": "Strings",
+     "body": "A piece of text in Python is called a **string**. You can write one with double quotes `\"like this\"` or single quotes `'like this'`; they mean exactly the same. Pick one style and stick to it, but switch when the text itself contains a quote: `\"It's open\"` is easier than escaping.\n\nSome characters can't be typed directly inside a string, so they're written with a backslash, called an **escape**. `\\n` is a new line, `\\t` is a tab, `\\\"` is a quote mark and `\\\\` is a backslash itself.",
+     "example": {
+      "code": "print(\"It's 9pm\")\nprint('She said \"hi\"')\nprint(\"Line one\\nLine two\")",
+      "explain": "The last line prints on two lines, because `\\n` starts a new one."
+     }
+    },
+    {
+     "heading": "print can take several values",
+     "body": "Give `print` several values separated by commas and it prints them all on one line, with a space between each. That's handy for mixing text and numbers, because you don't have to turn the numbers into text first.\n\nTwo optional settings change how this works. `sep` is what goes between the values (a space unless you say otherwise). `end` is what goes after the last one (a new line unless you say otherwise). You set them by name, after the values.",
+     "example": {
+      "code": "print(\"Pizzas:\", 6, \"Slices:\", 6 * 8)\nprint(\"2026\", \"11\", \"12\", sep=\"-\")\nprint(\"Loading\", end=\"...\")\nprint(\"done\")",
+      "explain": "This prints `Pizzas: 6 Slices: 48`, then `2026-11-12`, then `Loading...done` on one line."
+     }
+    },
+    {
+     "heading": "Comments",
+     "body": "A **comment** starts with `#`. Python ignores everything from the `#` to the end of the line, so comments are notes for people reading the code, including you in three weeks.\n\nGood comments explain **why**, not **what**. `# add 1` above `count = count + 1` tells the reader nothing new. `# The first order of the night is free` explains a decision they couldn't guess. You can also put `#` in front of a line of code to switch it off while testing, which is called **commenting it out**.",
+     "example": {
+      "code": "# Slices are cut in eights for the large size\nprint(6 * 8)\n# print(\"debug: oven check\")"
+     }
+    }
+   ],
+   "key_points": [
+    "A string is text in matching quotes. Single and double quotes mean the same.",
+    "Escapes like `\\n` (new line) and `\\\"` (quote) put special characters in a string.",
+    "`print(a, b, c)` prints values separated by spaces; `sep=` and `end=` change that.",
+    "`#` starts a comment. Explain why, not what."
+   ],
+   "mistakes": [
+    "Mismatched quotes, like `\"hello'`, which Python can't end.",
+    "Writing `sep` before the values, or without `=`.",
+    "Comments that repeat the code instead of explaining it."
+   ],
+   "try_it": "In the `>>>` prompt, try `print(\"a\", \"b\", \"c\", sep=\"\")`, then `sep=\", \"`. Print a string containing both a new line and a tab. Write a three-line script with a comment explaining each choice.",
+   "quiz": [
+    {
+     "question": "What does `print(\"a\", \"b\", sep=\"+\")` show?",
+     "choices": [
+      "`a b`",
+      "`a+b`",
+      "`ab`",
+      "`a + b`"
+     ],
+     "answer": 1,
+     "explain": "`sep` replaces the space between values, so it's `a+b`."
+    },
+    {
+     "question": "Which line is a comment?",
+     "choices": [
+      "`// note`",
+      "`-- note`",
+      "`# note`",
+      "`/* note */`"
+     ],
+     "answer": 2,
+     "explain": "In Python, comments start with `#`. The others belong to other languages."
+    },
+    {
+     "question": "How do you put a new line inside a string?",
+     "choices": [
+      "`/n`",
+      "`\\n`",
+      "`<br>`",
+      "`newline`"
+     ],
+     "answer": 1,
+     "explain": "A backslash and n is the escape for a new line."
+    }
+   ]
+  },
+  {
+   "id": "py01-l3",
+   "title": "Reading errors",
+   "summary": "Syntax errors versus runtime errors, reading a traceback, and the errors you'll meet first.",
+   "minutes": 10,
+   "sections": [
+    {
+     "heading": "Errors are messages, not failures",
+     "body": "Every programmer sees errors all day. An error is Python telling you, as precisely as it can, what it couldn't do and where. Learning to read them is one of the most valuable skills you can build, because the message usually contains the fix.\n\nThere are two kinds. A **syntax error** means the code isn't valid Python at all, like a missing bracket. Python finds these **before** running anything, so nothing runs. A **runtime error** (Python calls them **exceptions**) happens while the program is running, when a line is valid but can't be done, like dividing by zero. Everything before that line has already run."
+    },
+    {
+     "heading": "Reading a traceback",
+     "body": "When a runtime error happens, Python prints a **traceback**. Read it from the **bottom up**. The last line says what went wrong: the error's type, then a message. The lines above it say where: the file, the line number, and the line itself.",
+     "example": {
+      "code": "Traceback (most recent call last):\n  File \"main.py\", line 3, in <module>\n    print(total)\n          ^^^^^\nNameError: name 'total' is not defined",
+      "caption": "A traceback for a misspelt name:",
+      "explain": "Bottom line: a `NameError`, because nothing called `total` exists. One line up: it happened on line 3, at `print(total)`."
+     }
+    },
+    {
+     "heading": "The first errors you'll meet",
+     "body": "Most early errors are one of these:",
+     "bullets": [
+      "`SyntaxError`: the code isn't valid. Look for a missing bracket, quote or colon on that line or the one before.",
+      "`IndentationError`: the spaces at the start of a line are wrong. Python uses indentation to group code, so it has to be consistent.",
+      "`NameError`: you used a name that doesn't exist. Usually a typo, a missing quote around text, or using something before it was created.",
+      "`TypeError`: you mixed types that don't go together, like adding a number to a string.",
+      "`ZeroDivisionError`: you divided by zero."
+     ]
+    },
+    {
+     "heading": "A habit that saves hours",
+     "body": "When you hit an error, don't change things at random. Read the last line, go to the line number, and ask what Python saw there. If the line looks fine, check the line **above** it: an unclosed bracket on line 2 is often reported on line 3, because that's where Python noticed something was wrong."
+    }
+   ],
+   "key_points": [
+    "Syntax errors stop the whole program before it starts; runtime errors stop it partway.",
+    "Read a traceback from the bottom: error type and message first, then the line.",
+    "`NameError` is almost always a typo or missing quotes.",
+    "If the reported line looks fine, check the one before it."
+   ],
+   "mistakes": [
+    "Reading a traceback from the top and getting lost in the details.",
+    "Changing several things at once, so you can't tell which one fixed it.",
+    "Ignoring the line number Python gives you."
+   ],
+   "try_it": "Make some errors on purpose in the `>>>` prompt: `print(\"hi\"` (no closing bracket), `print(hello)` (no quotes), `\"5\" + 5`, and `1 / 0`. Read each message and say in your own words what it means.",
+   "quiz": [
+    {
+     "question": "Which part of a traceback do you read first?",
+     "choices": [
+      "The first line",
+      "The last line",
+      "The middle",
+      "None, just rerun it"
+     ],
+     "answer": 1,
+     "explain": "The last line names the error and explains it. The lines above say where it happened."
+    },
+    {
+     "question": "`print(scroe)` gives `NameError: name 'scroe' is not defined`. What's the likely fix?",
+     "choices": [
+      "Add quotes around scroe",
+      "Fix the spelling to the variable's real name",
+      "Restart Python",
+      "Use `Print` instead"
+     ],
+     "answer": 1,
+     "explain": "A NameError usually means a typo in a name. It was probably meant to be `score`."
+    },
+    {
+     "question": "A program has a syntax error on its last line. What runs?",
+     "choices": [
+      "Everything but the last line",
+      "Nothing",
+      "Only the last line",
+      "The first line"
+     ],
+     "answer": 1,
+     "explain": "Python checks the whole file for syntax before running anything, so nothing runs."
+    }
+   ]
+  }
+ ]
+}

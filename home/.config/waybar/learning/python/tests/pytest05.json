@@ -1,0 +1,126 @@
+{
+ "id": "pytest05",
+ "chapter": 5,
+ "title": "The pricing toolkit",
+ "runner": "program",
+ "timeout": 10,
+ "story": "The shop's new website needs a few small functions that other code will call: one to price a pizza, one to keep numbers in a range, and one to format prices. They're tested by calling them directly with different values, so they must **return** their answers, not print them.",
+ "requirements": [
+  {
+   "id": "r1",
+   "text": "`pizza_price(size, toppings=0)` returns the price: size `\"s\"` costs 7, `\"m\"` costs 9, `\"l\"` costs 11, plus 1.25 for each topping."
+  },
+  {
+   "id": "r2",
+   "text": "`pizza_price` uses 0 toppings when that argument is left out."
+  },
+  {
+   "id": "r3",
+   "text": "`clamp(value, low, high)` returns value, but never less than low or more than high."
+  },
+  {
+   "id": "r4",
+   "text": "`money(amount)` returns a string: `£` followed by the amount with exactly two decimal places."
+  },
+  {
+   "id": "r5",
+   "text": "None of the three functions print anything. They only return values."
+  },
+  {
+   "id": "r6",
+   "text": "Your file doesn't do anything else when it runs: no input, no prints at the top level."
+  }
+ ],
+ "steps": [
+  "Define the three functions with exactly these names and parameters.",
+  "In `pizza_price`, choose the base price from the size, then add the toppings.",
+  "In `clamp`, check the two limits.",
+  "In `money`, build the string with an f-string."
+ ],
+ "hints": [
+  "`def pizza_price(size, toppings=0):` gives toppings a default.",
+  "A dictionary like `{\"s\": 7, ...}` is a neat way to look up the base price.",
+  "`clamp` can be done with if/elif/else, or with `min` and `max` together."
+ ],
+ "static": [
+  {
+   "id": "r1",
+   "type": "uses",
+   "pattern": "def\\s+pizza_price\\s*\\(",
+   "fail": "Define a function called `pizza_price`."
+  },
+  {
+   "id": "r3",
+   "type": "uses",
+   "pattern": "def\\s+clamp\\s*\\(",
+   "fail": "Define a function called `clamp`."
+  },
+  {
+   "id": "r4",
+   "type": "uses",
+   "pattern": "def\\s+money\\s*\\(",
+   "fail": "Define a function called `money`."
+  },
+  {
+   "id": "r6",
+   "type": "not_uses",
+   "pattern": "input\\s*\\(",
+   "fail": "Don't read input in this test."
+  }
+ ],
+ "cases": [
+  {
+   "id": "r1",
+   "append": "print(pizza_price(\"m\", 2))",
+   "last": "11.5",
+   "label": "`pizza_price(\"m\", 2)`",
+   "fail": ""
+  },
+  {
+   "id": "r1",
+   "append": "print(pizza_price(\"l\", 4))",
+   "last": "16.0",
+   "label": "`pizza_price(\"l\", 4)`",
+   "fail": ""
+  },
+  {
+   "id": "r1",
+   "append": "print(pizza_price(\"s\", toppings=1))",
+   "last": "8.25",
+   "label": "`pizza_price(\"s\", toppings=1)`",
+   "fail": ""
+  },
+  {
+   "id": "r2",
+   "append": "print(pizza_price(\"s\"))",
+   "regex": "^7(\\.0)?$",
+   "label": "`pizza_price(\"s\")`",
+   "fail": "It should return 7."
+  },
+  {
+   "id": "r3",
+   "append": "print(clamp(5, 1, 10), clamp(-3, 0, 10), clamp(99, 0, 10), clamp(10, 0, 10))",
+   "last": "5 0 10 10",
+   "label": "four calls of clamp",
+   "fail": ""
+  },
+  {
+   "id": "r4",
+   "append": "print(money(3), money(2.5), money(10.257))",
+   "last": "£3.00 £2.50 £10.26",
+   "label": "`money(3)`, `money(2.5)` and `money(10.257)`",
+   "fail": ""
+  },
+  {
+   "id": "r5",
+   "append": "pizza_price(\"m\", 1); clamp(1, 2, 3); money(1)",
+   "output": "",
+   "fail": "Calling your functions printed something. They should only return values."
+  },
+  {
+   "id": "r6",
+   "output": "",
+   "fail": "Running your file on its own should print nothing."
+  }
+ ]
+}

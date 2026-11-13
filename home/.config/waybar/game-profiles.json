@@ -1,0 +1,16 @@
+{
+  "roblox": {
+    "silence": false,
+    "max_fps": false,
+    "vibrance": 50,
+    "shadow_lift": 0,
+    "sensitivity": null
+  },
+  "steam:322170": {
+    "silence": false,
+    "max_fps": false,
+    "vibrance": 22,
+    "shadow_lift": 0,
+    "sensitivity": null
+  }
+}

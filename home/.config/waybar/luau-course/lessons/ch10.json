@@ -1,0 +1,304 @@
+{
+ "chapter": "ch10",
+ "lessons": [
+  {
+   "id": "ch10-l1",
+   "title": "How Roblox runs your code",
+   "summary": "Threads, the task scheduler, yielding, and why a loop that never waits freezes everything.",
+   "minutes": 11,
+   "sections": [
+    {
+     "heading": "One thing at a time",
+     "body": "Your game may have dozens of scripts, but Luau runs only **one** piece of code at any instant. Each script, and each function waiting to run, lives in a **thread** (Roblox also calls them coroutines). Roblox's **task scheduler** decides which thread runs next.\n\nA thread runs until it **yields**: until it says \"I'm waiting for something, let others go\". `task.wait` yields, and so do things like waiting for an event or a network request. While one thread waits, the scheduler runs others. That's how many scripts appear to run at once, even though they take turns."
+    },
+    {
+     "heading": "Frames",
+     "body": "Roblox works in **frames**, many times per second. In each frame it handles input, runs scripts that are ready, simulates physics, and draws the screen. Code that's been waiting resumes at the right point in a frame, once its wait time has passed.\n\nBecause scripts take turns within a frame, the frame can't finish until every running script has yielded. A script that runs for a long time without yielding holds up the whole frame, and the game stutters or freezes. Keep each piece of work short, and spread big jobs across several frames by waiting in between."
+    },
+    {
+     "heading": "Why infinite loops freeze",
+     "body": "A `while true do` loop with no wait never yields. The scheduler never gets control back, so no other script runs, physics stops, and the screen stops updating. Roblox eventually stops the script with a timeout error, but until then everything hangs.\n\nAdding `task.wait()` inside the loop fixes it, because each run of the loop now yields, letting everything else have its turn. That's why every forever-loop you write needs a wait, as you learnt in chapter 4. Now you know the reason."
+    },
+    {
+     "heading": "Waiting isn't sleeping",
+     "body": "When a thread calls `task.wait(2)`, it doesn't block the computer for two seconds. It tells the scheduler \"wake me in about two seconds\" and steps aside. Other threads run in the meantime, and the waiting thread costs almost nothing.\n\nThe word **about** matters. A wait finishes at the first frame after the time has passed, so it's never shorter than asked, and is often a few milliseconds longer. `task.wait` returns the time that actually passed, which you can use when precise timing matters, like animating something smoothly."
+    }
+   ],
+   "key_points": [
+    "Only one thread runs at a time. The task scheduler takes turns between them.",
+    "Yielding hands control back. `task.wait` and waiting for events both yield.",
+    "Code that never yields holds up the whole frame and freezes the game.",
+    "A wait lasts at least as long as asked, and `task.wait` returns the real time passed."
+   ],
+   "mistakes": [
+    "Writing a long-running loop with no wait.",
+    "Expecting `task.wait(1)` to last exactly one second.",
+    "Doing a huge calculation in one go instead of spreading it over frames."
+   ],
+   "try_it": "Make two Scripts that each print their name in a loop with `task.wait(1)`, and watch them take turns in the Output. Then print what `task.wait(0.5)` returns a few times and notice it's slightly more than 0.5.",
+   "quiz": [
+    {
+     "question": "What does yielding mean?",
+     "choices": [
+      "Ending the script",
+      "A thread pausing so the scheduler can run others",
+      "Running two lines at the same instant",
+      "Throwing an error"
+     ],
+     "answer": 1,
+     "explain": "A yielding thread steps aside until whatever it's waiting for happens."
+    },
+    {
+     "question": "Why does a `while true do` loop with no wait freeze the game?",
+     "choices": [
+      "It uses too much memory",
+      "Roblox bans while loops",
+      "It never yields, so nothing else gets a turn",
+      "Loops can only run once per frame"
+     ],
+     "answer": 2,
+     "explain": "Without yielding, the scheduler never gets control back."
+    },
+    {
+     "question": "`local elapsed = task.wait(1)`. What is `elapsed` likely to be?",
+     "choices": [
+      "Slightly more than 1",
+      "Exactly 1",
+      "Slightly less than 1",
+      "`nil`"
+     ],
+     "answer": 0,
+     "explain": "A wait ends at the first frame after the time passes, so it's usually a little over."
+    }
+   ]
+  },
+  {
+   "id": "ch10-l2",
+   "title": "The task library",
+   "summary": "task.wait, task.spawn, task.defer, task.delay and task.cancel, and how each one schedules code.",
+   "minutes": 12,
+   "sections": [
+    {
+     "heading": "task.spawn",
+     "body": "`task.spawn(fn, ...)` starts `fn` in a **new thread** and runs it straight away, up to its first yield. Then control comes back to your code, which carries on, while the new thread continues by itself later. It returns the new thread.\n\nUse it whenever you need something to keep going in the background without holding up the code that started it: a loop that flickers a light forever, or a long sequence of timed events. Without spawn, calling a function with a forever loop would never return.",
+     "example": {
+      "caption": "Starting a background loop",
+      "code": "task.spawn(function()\n\twhile true do\n\t\tprint(\"Flicker\")\n\t\ttask.wait(2)\n\tend\nend)\nprint(\"This prints straight after the first flicker\")",
+      "explain": "The loop runs in its own thread, so the last line isn't stuck behind it."
+     }
+    },
+    {
+     "heading": "task.defer and task.delay",
+     "body": "`task.defer(fn, ...)` also starts a new thread, but **later**: at the end of the current scheduling step, after the current code has finished. It's useful when something must happen right after the current work rather than in the middle of it.\n\n`task.delay(seconds, fn, ...)` starts `fn` after at least that many seconds, without pausing the code that called it. It's the clean way to say \"do this in three seconds\" while carrying on with other work now."
+    },
+    {
+     "heading": "task.cancel",
+     "body": "Every one of these returns a thread, and `task.cancel(thread)` stops it. A delayed function that hasn't started yet will never start, and a waiting thread will never resume.\n\nCancelling is how you undo plans: a door that was going to slam shut in five seconds, but the player left first. Keep the thread in a variable when you might want to cancel it later. Cancelling a thread that already finished does nothing.\n\nCancelling is abrupt: the thread simply never resumes, so any cleanup it would have done afterwards doesn't happen. If a timer needs to tidy up when stopped, like switching a light back on, use a flag it checks instead, as the next lessons show."
+    },
+    {
+     "heading": "The old functions",
+     "body": "Older code uses the global functions `wait`, `spawn` and `delay`. They're deprecated: the task versions replaced them because the old ones were less precise and had odd delays. `wait()` could take noticeably longer than asked, and `spawn` didn't start straight away.\n\nWhen you see the old names in tutorials, translate them: `wait` becomes `task.wait`, `spawn` becomes `task.spawn` (or `task.defer`), and `delay` becomes `task.delay`. Write only the task versions in new code."
+    }
+   ],
+   "key_points": [
+    "`task.spawn` runs a function in a new thread right away, until it yields.",
+    "`task.defer` starts it later in the same step, and `task.delay` after some seconds.",
+    "Each returns a thread that `task.cancel` can stop.",
+    "Use the task library, not the deprecated `wait`, `spawn` and `delay`."
+   ],
+   "mistakes": [
+    "Calling a function containing a forever-loop directly instead of spawning it.",
+    "Forgetting to keep the thread when you might need to cancel it.",
+    "Using `wait()` and `spawn()` from old tutorials."
+   ],
+   "try_it": "Use `task.delay` to print \"Boo\" after three seconds, then cancel it before it fires and check nothing prints. Then spawn two loops that print at different speeds and watch them interleave.",
+   "quiz": [
+    {
+     "question": "What happens to the code after `task.spawn(fn)`?",
+     "choices": [
+      "It waits until fn finishes completely",
+      "It runs as soon as fn first yields or finishes",
+      "It never runs",
+      "It runs before fn starts"
+     ],
+     "answer": 1,
+     "explain": "spawn runs fn straight away until it yields, then returns to your code."
+    },
+    {
+     "question": "How do you stop a `task.delay` before it fires?",
+     "choices": [
+      "Call `task.cancel` on the thread it returned",
+      "Set the function to nil",
+      "Call `task.wait(0)`",
+      "You can't"
+     ],
+     "answer": 0,
+     "explain": "The returned thread can be cancelled, so the delayed function never runs."
+    },
+    {
+     "question": "What should `wait(2)` in old code become?",
+     "choices": [
+      "`task.delay(2)`",
+      "`task.spawn(2)`",
+      "`task.wait(2)`",
+      "`coroutine.wait(2)`"
+     ],
+     "answer": 2,
+     "explain": "task.wait is the modern replacement for the deprecated wait."
+    }
+   ]
+  },
+  {
+   "id": "ch10-l3",
+   "title": "Coroutines",
+   "summary": "Threads you control by hand: create, resume, yield, wrap, and passing values in and out.",
+   "minutes": 12,
+   "sections": [
+    {
+     "heading": "Threads you drive yourself",
+     "body": "The task library hands threads to Roblox's scheduler. The `coroutine` library lets you create threads and run them **yourself**, step by step. `coroutine.create(fn)` makes a thread from a function without starting it. `coroutine.resume(thread, ...)` runs it until it calls `coroutine.yield(...)`, at which point it pauses and control returns to whoever resumed it.\n\nResume it again and it continues from exactly where it paused, with all its local variables intact. This back-and-forth lets one function produce results a piece at a time, on demand."
+    },
+    {
+     "heading": "Passing values both ways",
+     "body": "Values travel in both directions. Arguments to `resume` arrive in the thread: the first time, as the function's parameters; afterwards, as the return values of the `yield` it paused on. Values passed to `yield` come back out of `resume`, after a first value of `true` meaning \"no error\".\n\nIf the thread errors, `resume` returns `false` and the error message, much like `pcall`. Once the function finishes, the thread is **dead**, and resuming it again returns false with an error message rather than running anything.",
+     "example": {
+      "caption": "Ticket numbers on demand",
+      "code": "local tickets = coroutine.create(function()\n\tfor number = 1, 3 do\n\t\tcoroutine.yield(number)\n\tend\nend)\nprint(coroutine.resume(tickets))\nprint(coroutine.resume(tickets))",
+      "explain": "Prints `true 1`, then `true 2`. Each resume runs until the next yield."
+     }
+    },
+    {
+     "heading": "Status and wrap",
+     "body": "`coroutine.status(thread)` tells you where a thread is: `\"suspended\"` (created or paused), `\"running\"`, `\"normal\"` (it resumed another thread that's now running) or `\"dead\"`. `coroutine.running()` returns the thread you're currently in.\n\n`coroutine.wrap(fn)` creates a thread and returns a plain **function** that resumes it. Calling the function returns what the thread yields, without the leading `true`. That makes generators tidy. The catch: a wrapped thread that has finished errors when called again, instead of quietly returning, so guard for that if callers might keep asking."
+    },
+    {
+     "heading": "Coroutines in Roblox",
+     "body": "In Roblox, `task.wait` and other yields work through the scheduler, which resumes threads for you. Mixing the two can surprise you: if a thread you resume by hand calls `task.wait`, the scheduler will resume it later, not you.\n\nSo use the **task library** for anything involving time or background work, and **coroutines** for logic that produces values step by step, like generators, or a sequence of moves you advance one at a time. Most everyday Roblox code only needs the task library."
+    }
+   ],
+   "key_points": [
+    "`coroutine.create` makes a thread, and `resume` runs it until it yields.",
+    "Values pass in through `resume` and out through `yield`.",
+    "`status` reports suspended, running, normal or dead.",
+    "`coroutine.wrap` returns a function that resumes the thread, and errors once it's dead."
+   ],
+   "mistakes": [
+    "Resuming a dead coroutine and ignoring the false it returns.",
+    "Calling a finished `coroutine.wrap` function, which errors.",
+    "Using coroutines for timing that the task library would handle better."
+   ],
+   "try_it": "Write a coroutine that yields the names of the houses on a street one by one, and resume it until it's dead, printing its status each time. Then rewrite it with `coroutine.wrap` and make the wrapper return nil once the street runs out.",
+   "quiz": [
+    {
+     "question": "What does `coroutine.resume` return after the thread yields `5`?",
+     "choices": [
+      "`5`",
+      "`false, 5`",
+      "`nil`",
+      "`true, 5`"
+     ],
+     "answer": 3,
+     "explain": "resume returns true for success, followed by the yielded values."
+    },
+    {
+     "question": "What's a thread's status after its function has finished?",
+     "choices": [
+      "`\"dead\"`",
+      "`\"suspended\"`",
+      "`\"finished\"`",
+      "`\"normal\"`"
+     ],
+     "answer": 0,
+     "explain": "A coroutine whose function has returned is dead."
+    },
+    {
+     "question": "What happens if you call a `coroutine.wrap` function after its thread has finished?",
+     "choices": [
+      "It returns nil forever",
+      "It restarts from the beginning",
+      "It errors",
+      "It returns true"
+     ],
+     "answer": 2,
+     "explain": "Unlike resume, wrap raises an error when the thread is dead."
+    }
+   ]
+  },
+  {
+   "id": "ch10-l4",
+   "title": "Timing patterns",
+   "summary": "Countdowns you can cancel, timeouts, running things side by side, and waiting for all of them.",
+   "minutes": 12,
+   "sections": [
+    {
+     "heading": "Cancellable timers",
+     "body": "Games are full of timers: a countdown before a round, a door that closes after a while, a monster that gives up the chase. Most of them need to be **cancellable**, because the situation changes.\n\nTwo patterns work well. Keep the thread and call `task.cancel` on it. Or keep a flag, or a number that changes each time a new timer starts, and have the timer check it after every wait, stopping when it no longer matches. The flag version lets the timer clean up after itself before it stops.",
+     "example": {
+      "caption": "A cancel function",
+      "code": "local function every(seconds, action)\n\tlocal running = true\n\ttask.spawn(function()\n\t\twhile running do task.wait(seconds) if running then action() end end\n\tend)\n\treturn function() running = false end\nend",
+      "explain": "Returns a function that stops the loop: a closure over the running flag."
+     }
+    },
+    {
+     "heading": "Timeouts",
+     "body": "Waiting for something that might never happen is dangerous: a player who never answers, a part that never appears. Always pair a wait with a **deadline**. Start the work in its own thread, then wait in small steps until it either finishes or the deadline passes, and give up cleanly if time runs out.\n\nThis is exactly how the course checker protects itself from code that never finishes. Many Roblox functions have a timeout built in, like the second argument to `WaitForChild`, which you'll meet in the next chapter."
+    },
+    {
+     "heading": "Side by side",
+     "body": "To do several slow things at once, spawn a thread for each. If three jobs take 3, 1 and 2 seconds, running them one after another takes 6 seconds, but side by side they take about 3.\n\nWaiting until **all** of them have finished needs a little bookkeeping. Count how many are still running: each thread lowers the count when it's done, and the waiting code loops with a short wait until the count reaches zero. Store each result at its job's position in a results table, so the order stays predictable whichever finishes first."
+    },
+    {
+     "heading": "Don't busy-wait",
+     "body": "Checking a condition every frame with `task.wait()` works, but it spends effort asking \"are we there yet\" constantly. When something tells you directly that it has happened, like an event (next chapter), wait for that instead.\n\nWhen polling is the only option, poll at a sensible rate. Checking a slow-changing thing ten times a second is plenty, and it costs a fraction of checking it every frame. Good timing code waits efficiently, always has a way out, and cleans up after itself."
+    }
+   ],
+   "key_points": [
+    "Timers should be cancellable, either with `task.cancel` or a flag the timer checks.",
+    "Pair every wait for something uncertain with a deadline.",
+    "Spawn threads to run jobs side by side, and count them down to wait for all.",
+    "Prefer events to polling, and poll at a sensible rate when you must."
+   ],
+   "mistakes": [
+    "Starting a new timer without stopping the old one, so two run at once.",
+    "Waiting forever for something that might never happen.",
+    "Running independent slow jobs one after another when they could overlap."
+   ],
+   "try_it": "Write a countdown from 5 that prints each second, with a cancel function you call after 2 seconds. Then run three jobs that wait 3, 1 and 2 seconds side by side, and print the order they finish in.",
+   "quiz": [
+    {
+     "question": "Three jobs take 2, 4 and 1 seconds. About how long do they take if spawned side by side?",
+     "choices": [
+      "7 seconds",
+      "4 seconds",
+      "1 second",
+      "2 seconds"
+     ],
+     "answer": 1,
+     "explain": "Running together, they finish when the slowest one does."
+    },
+    {
+     "question": "Why give a wait a deadline?",
+     "choices": [
+      "To make it more precise",
+      "Because task.wait requires one",
+      "So the code can give up if the thing never happens",
+      "To use less memory"
+     ],
+     "answer": 2,
+     "explain": "Without a deadline, a missing event leaves the code waiting forever."
+    },
+    {
+     "question": "You start a new countdown while an old one is still running. What should usually happen first?",
+     "choices": [
+      "Stop the old one",
+      "Nothing, let both run",
+      "Restart the game",
+      "Wait for the old one to finish"
+     ],
+     "answer": 0,
+     "explain": "Two timers running at once is a classic source of double-firing bugs."
+    }
+   ]
+  }
+ ]
+}

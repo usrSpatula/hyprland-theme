@@ -1,0 +1,28 @@
+# Everything the theme installs, as paths inside your home folder.
+# A line ending in / is a whole folder. install.sh and collect.sh both read this list.
+
+.config/hypr/hyprland.lua
+.config/hypr/screenshot.sh
+.config/hypr/share-picker.sh
+.config/hypr/wallpaper.jpg
+
+.config/waybar/config.jsonc
+.config/waybar/style.css
+.config/waybar/notch.py
+.config/waybar/control-center.py
+.config/waybar/game-menu.py
+.config/waybar/game-profiles.json
+.config/waybar/clips.py
+.config/waybar/gear-tools.py
+.config/waybar/learning.py
+.config/waybar/scripting-progress.py
+.config/waybar/learning/
+.config/waybar/luau-course/
+
+.config/kitty/kitty.conf
+.config/mako/config
+.config/wofi/config
+.config/wofi/style.css
+
+.local/bin/mac-osd
+.local/bin/spotlight-launcher

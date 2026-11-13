@@ -1,0 +1,232 @@
+// macOS-style menu bar: full-width, flat, translucent
+{
+    "layer": "top",
+    "position": "top",
+    "height": 28,
+    "margin": 0,
+    "spacing": 0,
+
+    "modules-left": [
+        "custom/apple",
+        "hyprland/window",
+        "group/learning"
+    ],
+    "modules-center": ["custom/notch"],
+    "modules-right": [
+        "tray",
+        "group/volume",
+        "bluetooth",
+        "network",
+        "custom/search",
+        "clock"
+    ],
+
+    "custom/apple": {
+        "format": "\uf179",
+        "tooltip": false,
+        "on-click": "wofi --show drun"
+    },
+
+    // App name in bold, like macOS (shows the focused app's class)
+    "hyprland/window": {
+        "format": "{class}",
+        "max-length": 24,
+        "separate-outputs": true,
+        // Clean app names. Rules run in alphabetical order, so the "z{0}" fallbacks stay last
+        "rewrite": {
+            "^$": "Finder",
+            "^amdgpu_top$": "AMDGPU Top",
+            "^assistant$": "Qt Assistant",
+            "^blender$": "Blender",
+            "^blueman-manager$": "Bluetooth",
+            "^btop$": "btop",
+            "^com\\.anthropic\\.claude$": "Claude",
+            "^designer$": "Qt Designer",
+            "^discord$": "Discord",
+            "^firefox$": "Firefox",
+            "^htop$": "htop",
+            "^io\\.github\\.klobraticc\\.voidstrap$": "Voidstrap",
+            "^kdesystemsettings$": "System Settings",
+            "^kitty$": "Kitty",
+            "^liner$": "Liner",
+            "^linguist$": "Qt Linguist",
+            "^lstopo$": "lstopo",
+            "^mpv$": "mpv",
+            "^nm-connection-editor$": "Network Settings",
+            "^org\\.kde\\.discover$": "Discover",
+            "^org\\.kde\\.dolphin$": "Dolphin",
+            "^org\\.kde\\.drkonqi\\.coredump\\.gui$": "Crash Viewer",
+            "^org\\.kde\\.kinfocenter$": "Info Center",
+            "^org\\.kde\\.kmenuedit$": "Menu Editor",
+            "^org\\.kde\\.konsole$": "Konsole",
+            "^org\\.kde\\.plasma-systemmonitor$": "System Monitor",
+            "^org\\.kde\\.plasma-welcome$": "Welcome Center",
+            "^org\\.kde\\.plasma\\.emojier$": "Emoji Selector",
+            "^org\\.kde\\.spectacle$": "Spectacle",
+            "^org\\.mozilla\\.firefox$": "Firefox",
+            "^org\\.pulseaudio\\.pavucontrol$": "Volume Control",
+            "^org\\.vinegarhq\\.sober$": "Sober",
+            "^org\\.vinegarhq\\.vinegar$": "Vinegar",
+            "^pavucontrol$": "Volume Control",
+            "^qdbusviewer$": "Qt D-Bus Viewer",
+            "^qv4l2$": "Qt V4L2",
+            "^qvidcap$": "Qt Video Capture",
+            "^robloxplayerbeta\\.exe$": "Roblox",
+            "^robloxstudiobeta\\.exe$": "Roblox Studio",
+            "^steam$": "Steam",
+            "^steam_app_322170$": "Geometry Dash",
+            "^steam_app_381210$": "Dead by Daylight",
+            "^steam_app_\\d+$": "Steam Game",
+            "^systemsettings$": "System Settings",
+            "^vim$": "Vim",
+            "^voidstrap$": "Voidstrap",
+            "^z{0}(.+)\\.exe$": "$1",
+            "^z{0}(?:[a-z0-9_-]+\\.)+([^.]+)$": "$1"
+        }
+    },
+
+    // Gear: click it to slide out the Learning, game menu, clips and gear-tools buttons (icons only), click again to hide them
+    "group/learning": {
+        "orientation": "horizontal",
+        "drawer": {
+            "click-to-reveal": true,
+            "transition-duration": 300,
+            "children-class": "learning-drawer",
+            "transition-left-to-right": true
+        },
+        "modules": [
+            "custom/gear",
+            "custom/learning",
+            "custom/game",
+            "custom/clips",
+            "custom/clipboard",
+            "custom/screenshots",
+            "custom/notes",
+            "custom/power"
+        ]
+    },
+
+    // Gear tools (see gear-tools.py): clipboard history, screenshots, quick notes, power menu
+    "custom/clipboard": {
+        "format": "\uf328",
+        "tooltip": false,
+        "on-click": "python3 $HOME/.config/waybar/gear-tools.py --clipboard"
+    },
+    "custom/screenshots": {
+        "format": "\uf302",
+        "tooltip": false,
+        "on-click": "python3 $HOME/.config/waybar/gear-tools.py --screenshots"
+    },
+    "custom/notes": {
+        "format": "\uf249",
+        "tooltip": false,
+        "on-click": "python3 $HOME/.config/waybar/gear-tools.py --notes"
+    },
+    "custom/power": {
+        "format": "\uf011",
+        "tooltip": false,
+        "on-click": "python3 $HOME/.config/waybar/gear-tools.py --power"
+    },
+
+    // Clips (see clips.py): the film opens the clips panel, with the recording on/off switch
+    // (Super+Insert) at the top and every clip below, newest first. Insert saves the last 30 seconds
+    "custom/clips": {
+        "format": "",
+        "tooltip": false,
+        "on-click": "python3 $HOME/.config/waybar/clips.py --browser"
+    },
+    "custom/gear": {
+        "format": "",
+        "tooltip": false
+    },
+
+    // Game mod menu: gamepad icon, bright while a game is open; click for its settings (see game-menu.py)
+    "custom/game": {
+        "exec": "python3 $HOME/.config/waybar/game-menu.py --watch",
+        "return-type": "json",
+        "restart-interval": 5,
+        "tooltip": false,
+        "on-click": "python3 $HOME/.config/waybar/game-menu.py --menu"
+    },
+
+    // Learning: a course for each scripting language, with lessons and auto-marked tests.
+    // The cap opens the language picker (see learning.py)
+    "custom/learning": {
+        "exec": "python3 $HOME/.config/waybar/learning.py",
+        "return-type": "json",
+        "interval": "once",
+        "signal": 9,
+        "tooltip": false,
+        "on-click": "python3 $HOME/.config/waybar/learning.py --hub"
+    },
+
+    // Starts the black notch, which draws itself in its own window (see notch.py)
+    "custom/notch": {
+        "exec": "python3 $HOME/.config/waybar/notch.py",
+        "restart-interval": 5,
+        "tooltip": false
+    },
+
+    "tray": {
+        "icon-size": 15,
+        "spacing": 10
+    },
+
+    "bluetooth": {
+        "format": "\uf294",
+        "format-connected": "\uf294",
+        "format-off": "\uf294",
+        "format-disabled": "\uf294",
+        "tooltip-format": "Bluetooth: {status}",
+        "tooltip-format-connected": "{device_alias}",
+        "on-click": "blueman-manager"
+    },
+
+    // Volume: hover the icon and a slider slides out; scroll to nudge, click to mute
+    "group/volume": {
+        "orientation": "horizontal",
+        "drawer": {
+            "transition-duration": 300,
+            "children-class": "volume-drawer",
+            "transition-left-to-right": false
+        },
+        "modules": ["pulseaudio", "pulseaudio/slider"]
+    },
+
+    "pulseaudio": {
+        "format": "{icon}",
+        "format-muted": "\uf6a9",
+        "format-icons": { "default": ["\uf026", "\uf027", "\uf028"] },
+        "tooltip-format": "Volume: {volume}%",
+        "scroll-step": 5,
+        "on-click": "wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle"
+    },
+
+    "pulseaudio/slider": {
+        "min": 0,
+        "max": 100,
+        "orientation": "horizontal"
+    },
+
+    "network": {
+        "format-wifi": "\uf1eb",
+        "format-ethernet": "\uf796",
+        "format-disconnected": "\uf1eb",
+        "tooltip-format-wifi": "{essid} ({signalStrength}%)",
+        "tooltip-format-ethernet": "{ifname}",
+        "on-click": "nm-connection-editor"
+    },
+
+    "custom/search": {
+        "format": "\uf002",
+        "tooltip": false,
+        "on-click": "wofi --show drun"
+    },
+
+    // "Sat 31 Oct  2:32 PM". Click for the Control Center (see control-center.py)
+    "clock": {
+        "format": "{:%a %d %b  %I:%M %p}",
+        "tooltip": false,
+        "on-click": "python3 $HOME/.config/waybar/control-center.py"
+    }
+}

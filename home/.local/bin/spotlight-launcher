@@ -1,0 +1,273 @@
+#!/usr/bin/env python3
+"""Spotlight-style app launcher for Super+D (GTK3 + gtk-layer-shell).
+
+Opens as just a search bar. Typing shows the top 3 matching apps and the
+panel grows/shrinks to fit them. Enter launches, Up/Down moves, Esc closes,
+and running it again while open closes it (so Super+D toggles).
+
+  spotlight-launcher --preview QUERY   open without grabbing the keyboard (for testing)
+"""
+import os
+import signal
+import subprocess
+import sys
+import warnings
+
+warnings.filterwarnings("ignore", category=DeprecationWarning)
+
+import gi  # noqa: E402
+gi.require_version("Gtk", "3.0")
+gi.require_version("Gdk", "3.0")
+gi.require_version("GtkLayerShell", "0.1")
+from gi.repository import Gdk, Gio, GLib, Gtk  # noqa: E402
+from gi.repository import GtkLayerShell  # noqa: E402  (after Gtk 3 is loaded)
+
+MAX_RESULTS = 3
+WIDTH = 680
+TOP_MARGIN = 200
+ICON_SIZE = 30
+PIDFILE = os.path.join(os.environ.get("XDG_RUNTIME_DIR", "/tmp"), "spotlight-launcher.pid")
+
+CSS = b"""
+* { font-family: "SF Pro Display", "Inter Display", "Inter", sans-serif; }
+
+window { background: transparent; }
+
+/* The bar and the results card are separate glass pieces, so the bar never
+   changes size; the card appears below it only when there are matches. */
+.glass {
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    background-color: rgba(28, 28, 32, 0.50);
+    /* gloss: bright sheen across the top, fading out by the middle */
+    background-image: linear-gradient(to bottom,
+        rgba(255, 255, 255, 0.16) 0%,
+        rgba(255, 255, 255, 0.05) 38%,
+        rgba(255, 255, 255, 0.00) 60%);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35),
+                inset 0 -1px 0 rgba(0, 0, 0, 0.25);
+}
+#bar { border-radius: 31px; }
+#card { border-radius: 22px; }
+
+#input {
+    margin: 4px 8px;
+    padding: 12px 10px;
+    min-height: 30px;
+    border: none;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+    outline: none;
+    color: #ffffff;
+    caret-color: #ffffff;
+    font-size: 24px;
+    font-weight: 300;
+}
+#input image {
+    color: rgba(255, 255, 255, 0.55);
+    -gtk-icon-transform: scale(1.35);
+    margin: 0 10px 0 4px;
+}
+
+#results { margin: 8px; background: transparent; }
+#results row {
+    transition: background-color 120ms ease-out;
+    padding: 6px 10px;
+    margin: 1px 0;
+    border-radius: 10px;
+    background: transparent;
+    outline: none;
+}
+#results row:hover { background-color: rgba(255, 255, 255, 0.08); }
+#results row:selected {
+    background-color: rgba(10, 132, 255, 0.92);
+    background-image: linear-gradient(to bottom, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0.00));
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25);
+}
+#results image { margin: 0 10px 0 2px; }
+#results label { color: rgba(255, 255, 255, 0.92); font-size: 15px; }
+#results row:selected label { color: #ffffff; }
+"""
+
+
+def close_running_instance():
+    """If a launcher is already open, close it and return True."""
+    try:
+        with open(PIDFILE) as f:
+            pid = int(f.read())
+        with open(f"/proc/{pid}/cmdline", "rb") as f:
+            if b"spotlight-launcher" not in f.read():
+                return False
+        os.kill(pid, signal.SIGTERM)
+        return True
+    except (OSError, ValueError):
+        return False
+
+
+def score(app, q):
+    """Lower is better; None means no match."""
+    name = (app.get_display_name() or "").lower()
+    if name.startswith(q):
+        return 0
+    if any(w.startswith(q) for w in name.split()):
+        return 1
+    if q in name:
+        return 2
+    extra = [app.get_executable() or ""]
+    if isinstance(app, Gio.DesktopAppInfo):
+        extra += [app.get_generic_name() or ""] + list(app.get_keywords() or [])
+    if q in " ".join(extra).lower():
+        return 3
+    return None
+
+
+class Launcher(Gtk.Window):
+    def __init__(self, preview=None):
+        super().__init__()
+        self.apps = [a for a in Gio.AppInfo.get_all() if a.should_show()]
+        self.matches = []
+
+        GtkLayerShell.init_for_window(self)
+        GtkLayerShell.set_namespace(self, "spotlight")
+        GtkLayerShell.set_layer(self, GtkLayerShell.Layer.OVERLAY)
+        GtkLayerShell.set_anchor(self, GtkLayerShell.Edge.TOP, True)
+        GtkLayerShell.set_margin(self, GtkLayerShell.Edge.TOP, TOP_MARGIN)
+        GtkLayerShell.set_keyboard_mode(
+            self, GtkLayerShell.KeyboardMode.NONE if preview is not None
+            else GtkLayerShell.KeyboardMode.EXCLUSIVE)
+
+        visual = self.get_screen().get_rgba_visual()
+        if visual:
+            self.set_visual(visual)
+        self.set_app_paintable(True)
+        provider = Gtk.CssProvider()
+        provider.load_from_data(CSS)
+        Gtk.StyleContext.add_provider_for_screen(
+            Gdk.Screen.get_default(), provider, Gtk.STYLE_PROVIDER_PRIORITY_USER)
+
+        stack = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
+        stack.set_size_request(WIDTH, -1)
+        self.add(stack)
+
+        bar = Gtk.Box(name="bar")
+        bar.get_style_context().add_class("glass")
+        stack.pack_start(bar, False, False, 0)
+        self.card = Gtk.Box(name="card")
+        self.card.get_style_context().add_class("glass")
+        stack.pack_start(self.card, False, False, 0)
+
+        self.entry = Gtk.SearchEntry(name="input", placeholder_text="Spotlight Search")
+        self.entry.connect("changed", self.on_changed)
+        self.entry.connect("activate", lambda *_: self.launch_selected())
+        bar.pack_start(self.entry, True, True, 0)
+
+        self.results = Gtk.ListBox(name="results")
+        self.results.set_selection_mode(Gtk.SelectionMode.SINGLE)
+        self.results.connect("row-activated", lambda _lb, row: self.launch(row.get_index()))
+        self.card.pack_start(self.results, True, True, 0)
+
+        self.connect("key-press-event", self.on_key)
+        self.connect("destroy", Gtk.main_quit)
+        self.show_all()
+        # Size the window once for the full 3-result layout and never resize it:
+        # Hyprland animates layer resizes, which visibly stretches the bar.
+        self.stack = stack
+        self.fill_results(self.apps[:MAX_RESULTS])
+        stack.set_size_request(WIDTH, stack.get_preferred_height()[1])
+        self.fill_results([])
+        self.connect("button-press-event", self.on_click)
+        self.entry.grab_focus()
+
+        if preview is not None:
+            self.entry.set_text(preview)
+            GLib.timeout_add_seconds(4, Gtk.main_quit)
+
+    def on_changed(self, _entry):
+        q = self.entry.get_text().strip().lower()
+        scored = [(s, a) for a in self.apps if q and (s := score(a, q)) is not None]
+        scored.sort(key=lambda t: (t[0], t[1].get_display_name().lower()))
+        self.fill_results([a for _, a in scored[:MAX_RESULTS]])
+
+    def fill_results(self, apps):
+        for row in self.results.get_children():
+            self.results.remove(row)
+        self.matches = apps
+        for app in self.matches:
+            box = Gtk.Box(spacing=0)
+            icon = app.get_icon() or Gio.ThemedIcon.new("application-x-executable")
+            img = Gtk.Image.new_from_gicon(icon, Gtk.IconSize.DIALOG)
+            img.set_pixel_size(ICON_SIZE)
+            box.pack_start(img, False, False, 0)
+            box.pack_start(Gtk.Label(label=app.get_display_name(), xalign=0), True, True, 0)
+            row = Gtk.ListBoxRow()
+            row.add(box)
+            self.results.add(row)
+
+        if self.matches:
+            self.card.show_all()
+            self.results.select_row(self.results.get_row_at_index(0))
+        else:
+            self.card.hide()
+
+    def on_click(self, _w, event):
+        """A click on the empty space below the glass closes it, like Spotlight."""
+        for w in (self.entry.get_parent(), self.card):
+            a = w.get_allocation()
+            if w.get_visible() and a.y <= event.y < a.y + a.height:
+                return False
+        Gtk.main_quit()
+        return True
+
+    def on_key(self, _w, event):
+        key = event.keyval
+        if key == Gdk.KEY_Escape:
+            Gtk.main_quit()
+            return True
+        if key in (Gdk.KEY_Down, Gdk.KEY_Up, Gdk.KEY_Tab) and self.matches:
+            row = self.results.get_selected_row()
+            i = row.get_index() if row else -1
+            i += -1 if key == Gdk.KEY_Up else 1
+            i %= len(self.matches)
+            self.results.select_row(self.results.get_row_at_index(i))
+            return True
+        return False
+
+    def launch_selected(self):
+        row = self.results.get_selected_row()
+        if row:
+            self.launch(row.get_index())
+
+    def launch(self, i):
+        app = self.matches[i]
+        app_id = app.get_id() if isinstance(app, Gio.DesktopAppInfo) else None
+        if app_id:
+            subprocess.Popen(["gtk-launch", app_id], start_new_session=True,
+                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        else:
+            app.launch([], None)
+        Gtk.main_quit()
+
+
+def main():
+    preview = None
+    if len(sys.argv) >= 2 and sys.argv[1] == "--preview":
+        preview = sys.argv[2] if len(sys.argv) > 2 else ""
+    elif close_running_instance():
+        return
+    with open(PIDFILE, "w") as f:
+        f.write(str(os.getpid()))
+    GLib.unix_signal_add(GLib.PRIORITY_DEFAULT, signal.SIGTERM, Gtk.main_quit)
+    Launcher(preview)
+    try:
+        Gtk.main()
+    finally:
+        try:
+            with open(PIDFILE) as f:
+                if f.read() == str(os.getpid()):
+                    os.remove(PIDFILE)
+        except OSError:
+            pass
+
+
+if __name__ == "__main__":
+    main()

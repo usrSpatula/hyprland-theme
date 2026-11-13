@@ -1,0 +1,6 @@
+__pycache__/
+*.pyc
+*.partial
+*.bak
+*.pre-*
+sounds-old/

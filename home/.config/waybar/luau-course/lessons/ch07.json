@@ -1,0 +1,406 @@
+{
+ "chapter": "ch07",
+ "lessons": [
+  {
+   "id": "ch07-l1",
+   "title": "String methods",
+   "summary": "The string library, the colon shorthand for calling it, and cutting strings up with sub.",
+   "minutes": 10,
+   "sections": [
+    {
+     "heading": "The string library",
+     "body": "Luau comes with a library of functions for working with text, all stored in the `string` table: `string.upper`, `string.lower`, `string.len`, `string.rep`, `string.reverse`, `string.sub` and more. Each takes the string as its first argument.\n\nBecause strings are used so much, there's a shorthand. Writing the string, a **colon**, then the function name passes the string in automatically. So `name:upper()` means exactly `string.upper(name)`. The colon form is what you'll see in almost all Roblox code.",
+     "example": {
+      "caption": "Two ways to write the same call",
+      "code": "local street = \"Crow Lane\"\nprint(string.upper(street))\nprint(street:upper())\nprint(street:lower(), street:len())",
+      "explain": "The first two lines print the same thing. The last prints `crow lane 9`."
+     }
+    },
+    {
+     "heading": "Strings never change",
+     "body": "Every string function returns a **new** string. The original is never changed, because strings in Luau are immutable. So `name:upper()` on its own line does nothing useful: the uppercase version is created and immediately thrown away.\n\nIf you want to keep the result, store it, usually back in the same variable. This is the single most common mistake with string functions, and it fails silently. Remember it whenever a string function seems to have no effect."
+    },
+    {
+     "heading": "Cutting with sub",
+     "body": "`text:sub(start, finish)` returns the part of a string from position `start` to position `finish`, counting from 1 and including both ends. Leave out `finish` to go to the end.\n\nNegative positions count from the **end**: `-1` is the last character, `-2` the one before. So `text:sub(-3)` is the last three characters, and `text:sub(2, -2)` drops the first and last. Positions past either end are simply clipped, not an error.\n\nA common use is checking prefixes and suffixes: whether a part's name starts with \"Door\", or a message ends with a question mark. Comparing `name:sub(1, 4)` with `\"Door\"` answers the first in one line, with no loop needed.",
+     "example": {
+      "caption": "Slicing a code",
+      "code": "local code = \"ORD-2048-X\"\nprint(code:sub(1, 3))\nprint(code:sub(5, 8))\nprint(code:sub(-1))",
+      "explain": "Prints `ORD`, `2048` and `X`."
+     }
+    },
+    {
+     "heading": "Repeating and reversing",
+     "body": "`text:rep(n)` repeats a string n times, with an optional separator as the second argument: `(\"ha\"):rep(3)` is `\"hahaha\"`. It's handy for drawing simple bars or padding. Note the brackets around the literal string: a colon can't follow a quoted string directly, so wrap it.\n\n`text:reverse()` flips a string, and `text:len()` gives its length, the same as `#text`. Strictly, these count **bytes**, which matches characters for plain English text. Letters with accents or emoji take several bytes each; the `utf8` library handles those when you need it."
+    }
+   ],
+   "key_points": [
+    "`text:fn(args)` is shorthand for `string.fn(text, args)`.",
+    "String functions return new strings. The original never changes.",
+    "`sub` cuts by position, including both ends, and negatives count from the end.",
+    "Wrap a literal string in brackets before using the colon on it."
+   ],
+   "mistakes": [
+    "Calling `name:upper()` without storing the result.",
+    "Forgetting that `sub` includes both end positions.",
+    "Writing `\"text\":upper()` without brackets around the string."
+   ],
+   "try_it": "Take a street name, print it in capitals, print its first three letters, its last letter, and the whole thing reversed. Then print a loading bar made of a character repeated 10 times.",
+   "quiz": [
+    {
+     "question": "What does `(\"pizza\"):sub(2, 4)` return?",
+     "choices": [
+      "`\"izz\"`",
+      "`\"iz\"`",
+      "`\"pizz\"`",
+      "`\"zz\"`"
+     ],
+     "answer": 0,
+     "explain": "Positions 2, 3 and 4 are i, z and z. Both ends are included."
+    },
+    {
+     "question": "After `local s = \"night\"` and then `s:upper()`, what is `s`?",
+     "choices": [
+      "`\"NIGHT\"`",
+      "`\"night\"`",
+      "`nil`",
+      "`\"Night\"`"
+     ],
+     "answer": 1,
+     "explain": "Strings never change. The uppercase copy was created and thrown away."
+    },
+    {
+     "question": "What does `(\"lantern\"):sub(-3)` return?",
+     "choices": [
+      "`\"lan\"`",
+      "`\"rn\"`",
+      "`\"ern\"`",
+      "`\"ter\"`"
+     ],
+     "answer": 2,
+     "explain": "-3 starts three characters from the end and runs to the end."
+    }
+   ]
+  },
+  {
+   "id": "ch07-l2",
+   "title": "Searching with patterns",
+   "summary": "find, match, gmatch and gsub, and the pattern language that describes what to look for.",
+   "minutes": 13,
+   "sections": [
+    {
+     "heading": "Finding text",
+     "body": "`text:find(what)` searches for `what` and returns the start and end positions of the first match, or `nil` if there isn't one. So it doubles as a yes-or-no check.\n\nBy default the search text is a **pattern**, a little language where some characters have special meanings. If you just want plain text, pass `1` as the start position and `true` as a fourth argument to turn patterns off. That matters whenever you search for characters like dots, brackets or percent signs."
+    },
+    {
+     "heading": "The pattern language",
+     "body": "Patterns describe the **shape** of text. A percent sign followed by a letter is a **character class**: `%d` matches any digit, `%a` any letter, `%w` any letter or digit, `%s` any space, and `%p` any punctuation. A dot matches any character at all. Square brackets build your own set, like `[aeiou]`, and a `^` inside them flips it.\n\nAfter a class, a **quantifier** says how many: `+` means one or more, `*` zero or more, `-` zero or more but as few as possible, and `?` zero or one. A `^` at the start of a pattern pins it to the start of the text, and a `$` at the end pins it to the end. To match a special character literally, put `%` before it: `%.` is a real dot.",
+     "bullets": [
+      "`%d+` matches a whole number, like `2048`",
+      "`%a+` matches a word made of letters",
+      "`^%s*` matches spaces at the start",
+      "`%.` matches a real full stop"
+     ]
+    },
+    {
+     "heading": "Pulling pieces out with match",
+     "body": "`text:match(pattern)` returns the part of the text that matched, or `nil`. Wrap parts of the pattern in round brackets to make **captures**, and `match` returns just those parts, one value per capture.\n\nCaptures always come back as strings. If you captured digits and want a number, convert with `tonumber`. Anchoring the pattern with `^` and `$` makes sure the **whole** text has the shape you expect, not just some part of it.",
+     "example": {
+      "caption": "Reading a slip of paper",
+      "code": "local slip = \"House 14: 3 pizzas\"\nlocal house, count = slip:match(\"^House (%d+): (%d+) pizzas$\")\nprint(tonumber(house) + 1, tonumber(count))",
+      "explain": "The two captures are \"14\" and \"3\". Converted to numbers, this prints `15 3`."
+     }
+    },
+    {
+     "heading": "Every match, and replacing",
+     "body": "`text:gmatch(pattern)` gives every match in turn, for use in a loop: `for word in text:gmatch(\"%a+\") do` visits each word. With captures, the loop gets one variable per capture.\n\n`text:gsub(pattern, replacement)` replaces every match and returns the new string, plus a count of how many replacements it made. The replacement can be a string, where `%1` stands for the first capture, a table to look matches up in, or a function that receives each match and returns its replacement. When you only want the new string, wrap the call in brackets to drop the count.",
+     "example": {
+      "caption": "Hiding the numbers",
+      "code": "local note = \"Ring 3 times at 11pm\"\nlocal hidden, changed = note:gsub(\"%d\", \"#\")\nprint(hidden, changed)",
+      "explain": "Prints `Ring # times at ##pm 3`: three digits were replaced."
+     }
+    }
+   ],
+   "key_points": [
+    "`find` gives positions, `match` gives the matched text or captures, `gmatch` loops over matches, `gsub` replaces.",
+    "`%d`, `%a`, `%w`, `%s`, `%p` and `.` are classes. `+ * - ?` say how many.",
+    "`^` and `$` anchor a pattern to the start and end.",
+    "Captures come back as strings. Convert numbers with `tonumber`."
+   ],
+   "mistakes": [
+    "Searching for a dot or bracket without escaping it, or without turning patterns off.",
+    "Forgetting that `gsub` returns two values.",
+    "Matching part of a string when you meant to check the whole thing, by leaving out `^` and `$`."
+   ],
+   "try_it": "From a sentence like \"Order 7 for Mrs Hill at 22:15\", pull out the order number, the name and the time with one match. Then count the words in a sentence with gmatch, and replace every vowel with an asterisk using gsub.",
+   "quiz": [
+    {
+     "question": "What does `(\"Table 12\"):match(\"%d+\")` return?",
+     "choices": [
+      "`12`",
+      "`\"12\"`",
+      "`\"Table\"`",
+      "`nil`"
+     ],
+     "answer": 1,
+     "explain": "match returns the matched text, which is always a string."
+    },
+    {
+     "question": "Which pattern matches a string made only of digits?",
+     "choices": [
+      "`%d+`",
+      "`%d*`",
+      "`^%d+$`",
+      "`[%d]`"
+     ],
+     "answer": 2,
+     "explain": "The anchors make the whole string consist of digits. Without them, any digit anywhere matches."
+    },
+    {
+     "question": "What does `select(2, (\"aaa\"):gsub(\"a\", \"b\"))` give?",
+     "choices": [
+      "`3`",
+      "`\"bbb\"`",
+      "`1`",
+      "`\"aaa\"`"
+     ],
+     "answer": 0,
+     "explain": "gsub returns the new string and the number of replacements, and select picks the second value."
+    }
+   ]
+  },
+  {
+   "id": "ch07-l3",
+   "title": "Formatting text",
+   "summary": "string.format for neat numbers and padding, interpolated strings, and splitting text apart.",
+   "minutes": 10,
+   "sections": [
+    {
+     "heading": "string.format",
+     "body": "`string.format` builds a string from a template with **placeholders** that start with `%`. Each placeholder is replaced by the next argument. `%s` inserts any value as text, `%d` a whole number, and `%f` a decimal number.\n\nThe power is in the details you can add. `%.2f` shows exactly two decimal places, which is perfect for money. A number before the letter sets a minimum width, so `%5d` pads with spaces to five characters, and `%05d` pads with zeros instead. To write a real percent sign, use `%%`.",
+     "example": {
+      "caption": "Tidy numbers",
+      "code": "print(string.format(\"Total: $%.2f\", 7.5))\nprint(string.format(\"Order #%04d\", 42))\nprint(string.format(\"%s tipped %d%%\", \"Hill\", 15))",
+      "explain": "Prints `Total: $7.50`, `Order #0042` and `Hill tipped 15%`."
+     }
+    },
+    {
+     "heading": "Interpolated strings",
+     "body": "Luau also has **interpolated strings**, written between backticks instead of quotes. Inside them, anything in curly brackets is worked out and inserted as text. It reads more naturally than joining with dots, and there's no risk of forgetting a space.\n\nUse interpolation for everyday messages, and `string.format` when you need control over decimals, padding or width. Interpolated strings don't do formatting by themselves, but you can call `string.format` inside the curly brackets.",
+     "example": {
+      "caption": "Values inside a string",
+      "code": "local name, pizzas = \"Vance\", 3\nprint(`{name} ordered {pizzas} pizzas`)\nprint(`That's {pizzas * 12} dollars`)",
+      "explain": "Prints `Vance ordered 3 pizzas` and `That's 36 dollars`."
+     }
+    },
+    {
+     "heading": "Splitting text",
+     "body": "`text:split(separator)` breaks a string into an array of pieces wherever the separator appears, so \"pepperoni,cheese,ghost\" split on a comma gives three items. The separator is plain text, not a pattern.\n\nSplitting and joining are opposites: `table.concat` from chapter 6 joins an array with a separator, and `split` takes it apart again. Together they're how you turn a list into a single line of text and back.\n\nSplitting is often the first step in reading simple data, such as a line of settings separated by commas. After splitting, each piece is still a string, so convert numbers with `tonumber` and check for `nil` before you trust them."
+    },
+    {
+     "heading": "Formatting for players",
+     "body": "Text players read deserves care. Round numbers before showing them. Use singular and plural correctly, which an if-expression does in one line. Keep messages short, and put the most important information first.\n\nAs a rule, keep the **data** as numbers for as long as possible and turn it into text only at the very end, when you display it. Once a number has been formatted into a string, you can't easily do maths with it any more."
+    }
+   ],
+   "key_points": [
+    "`string.format` fills `%s`, `%d` and `%f` placeholders, with control over decimals and width.",
+    "Interpolated strings use backticks and curly brackets.",
+    "`split` breaks text into an array, and `table.concat` joins one back up.",
+    "Keep values as numbers until the moment you display them."
+   ],
+   "mistakes": [
+    "Forgetting `%%` when you want a percent sign in a format string.",
+    "Passing fewer arguments than placeholders, which errors.",
+    "Doing maths on numbers that have already been formatted into strings."
+   ],
+   "try_it": "Format a price as dollars with two decimal places, an order number padded to five digits with zeros, and a sentence with a name and a count using backticks. Then split \"cheese,ghost,olive\" into a list and join it back with \" and \".",
+   "quiz": [
+    {
+     "question": "What does `string.format(\"%.2f\", 3)` give?",
+     "choices": [
+      "`\"3\"`",
+      "`\"3.0\"`",
+      "`\"3.00\"`",
+      "An error"
+     ],
+     "answer": 2,
+     "explain": "%.2f always shows exactly two decimal places, even for whole numbers."
+    },
+    {
+     "question": "What does `(\"a,b,,c\"):split(\",\")` give?",
+     "choices": [
+      "`{\"a\", \"b\", \"c\"}`",
+      "`{\"a,b,,c\"}`",
+      "An error",
+      "`{\"a\", \"b\", \"\", \"c\"}`"
+     ],
+     "answer": 3,
+     "explain": "Two commas in a row produce an empty piece between them."
+    },
+    {
+     "question": "How do you write a literal percent sign in a format string?",
+     "choices": [
+      "`%%`",
+      "`\\%`",
+      "`%p`",
+      "`%s`"
+     ],
+     "answer": 0,
+     "explain": "Doubling the percent sign tells format it isn't a placeholder."
+    }
+   ]
+  },
+  {
+   "id": "ch07-l4",
+   "title": "The math library",
+   "summary": "Rounding, limits, distances and constants: the math functions you'll use in every game.",
+   "minutes": 10,
+   "sections": [
+    {
+     "heading": "Rounding",
+     "body": "`math.floor(x)` rounds down to a whole number, `math.ceil(x)` rounds up, and `math.round(x)` rounds to the nearest, with halves going away from zero, so 2.5 becomes 3 and -2.5 becomes -3.\n\nTo round to some decimal places, scale up, round, and scale back: multiply by 100, round, then divide by 100 to keep two places. For **displaying** decimals, `string.format` is usually simpler. Rounding the actual value only matters when the rounded number is used in later maths.",
+     "example": {
+      "caption": "Rounding a tip",
+      "code": "local tip = 4.567\nprint(math.floor(tip), math.ceil(tip), math.round(tip))\nprint(math.round(tip * 100) / 100)",
+      "explain": "Prints `4 5 5`, then `4.57`."
+     }
+    },
+    {
+     "heading": "Limits",
+     "body": "`math.min` and `math.max` return the smallest or largest of any number of arguments. `math.clamp(x, low, high)` keeps x inside a range: below `low` it gives `low`, above `high` it gives `high`, and in between it gives x unchanged. Clamping is everywhere in games: health that can't go below 0, speed that can't exceed a limit, volume between 0 and 1.\n\n`math.abs(x)` removes the sign, giving a distance between two numbers when applied to their difference. `math.sign(x)` gives -1, 0 or 1, telling you only which direction a number points."
+    },
+    {
+     "heading": "Powers, roots and constants",
+     "body": "`math.sqrt(x)` is the square root, and `x ^ 0.5` gives the same answer. Together with powers, it's how distances are calculated: across a flat map, the distance between two points is the square root of the two differences squared and added. In Roblox you'll usually let `Vector3` do that for you, in chapter 11.\n\n`math.pi` is pi, for anything involving circles or angles, and `math.huge` is a number bigger than any other. It's a handy starting value when searching for the smallest of something, since every real value is smaller."
+    },
+    {
+     "heading": "Reading maths in code",
+     "body": "Games are full of small formulas: damage after armour, pay that grows with deliveries, how dark the sky gets as the night goes on. Write each one as a small, well-named function with its constants named at the top. A function called `nightDarkness(hour)` with clear limits is far easier to tune and trust than the same maths scattered inline.\n\nWhen a formula misbehaves, print its inputs and output for a handful of values, including the edges like 0 and the maximum. Most formula bugs are at the edges."
+    }
+   ],
+   "key_points": [
+    "`floor` rounds down, `ceil` up, `round` to nearest, with halves away from zero.",
+    "`min`, `max` and `clamp` keep values within limits.",
+    "`abs` gives a size without a sign, and `sqrt` a square root.",
+    "`math.huge` is bigger than any number, which is useful as a starting value."
+   ],
+   "mistakes": [
+    "Rounding with floor when you meant to round to the nearest.",
+    "Passing `clamp` a low value bigger than the high value, which errors.",
+    "Scattering formula constants through the code instead of naming them."
+   ],
+   "try_it": "Write a function that clamps a player's health between 0 and 100 and test it with -20, 50 and 250. Then round 3.14159 to two decimal places, and find the smallest number in a list by starting from `math.huge`.",
+   "quiz": [
+    {
+     "question": "What is `math.clamp(150, 0, 100)`?",
+     "choices": [
+      "`150`",
+      "`100`",
+      "`0`",
+      "`50`"
+     ],
+     "answer": 1,
+     "explain": "150 is above the high limit, so clamp returns 100."
+    },
+    {
+     "question": "What is `math.round(-2.5)`?",
+     "choices": [
+      "`-3`",
+      "`-2`",
+      "`-2.5`",
+      "`2`"
+     ],
+     "answer": 0,
+     "explain": "math.round sends halves away from zero."
+    },
+    {
+     "question": "Why start a \"find the smallest\" search with `math.huge`?",
+     "choices": [
+      "It's the only number Luau can compare",
+      "It makes the loop faster",
+      "Any real value will be smaller, so the first one replaces it",
+      "It stops the loop early"
+     ],
+     "answer": 2,
+     "explain": "Starting with the biggest possible number guarantees the first real value wins."
+    }
+   ]
+  },
+  {
+   "id": "ch07-l5",
+   "title": "Randomness",
+   "summary": "math.random, Roblox's Random objects, and picking, shuffling and weighting things fairly.",
+   "minutes": 10,
+   "sections": [
+    {
+     "heading": "math.random",
+     "body": "`math.random()` with no arguments returns a decimal from 0 up to (but not including) 1. With one argument, `math.random(n)` returns a whole number from 1 to n. With two, `math.random(low, high)` returns a whole number from low to high, including both.\n\nThat makes picking a random item from an array one line: index the array with a random number from 1 to its length. Roblox seeds the generator for you, so you get different results each time the game runs.",
+     "example": {
+      "caption": "A random customer",
+      "code": "local customers = { \"Hill\", \"Vance\", \"Okafor\" }\nlocal pick = customers[math.random(1, #customers)]\nprint(\"Next up:\", pick)",
+      "explain": "Prints one of the three names, chosen at random."
+     }
+    },
+    {
+     "heading": "Random objects",
+     "body": "Roblox also has `Random.new()`, which creates a separate random generator with methods like `NextInteger(low, high)` and `NextNumber(low, high)`. NextNumber gives decimals in a range, which `math.random` can't do directly.\n\nPass a number to `Random.new(seed)` and the generator produces the **same** sequence every time. That's how games make repeatable randomness, like a map generated from a seed that every player can share. `Random` belongs to Roblox rather than the Luau language, so it doesn't exist in plain Luau outside Roblox."
+    },
+    {
+     "heading": "Chances and weights",
+     "body": "For a percentage chance, compare `math.random()` with a fraction: `if math.random() < 0.2 then` is true about 20% of the time.\n\nFor **weighted** choices, where some outcomes are more likely, give each a weight, add the weights up, pick a random number up to the total, then walk through the options subtracting weights until the number runs out. A plant with weight 3 and a figure with weight 1 means the plant turns up three times as often."
+    },
+    {
+     "heading": "Shuffling and fairness",
+     "body": "To shuffle an array fairly, go from the last position down to the second, and swap each item with a randomly chosen item at or before it. This is the Fisher-Yates shuffle, and every order is equally likely. Shuffling by sorting with a random comparison is a common shortcut that is both unfair and can error.\n\nRandomness feels unfair to players more often than you'd expect: three monsters in a row feels broken even when it's genuinely random. Games often bend randomness on purpose, for example by not repeating the last choice, which is easy once you understand the basics."
+    }
+   ],
+   "key_points": [
+    "`math.random()` gives 0 to 1, `math.random(n)` 1 to n, `math.random(a, b)` a to b.",
+    "`Random.new(seed)` gives a repeatable generator with `NextInteger` and `NextNumber`.",
+    "Compare `math.random()` with a fraction for percentage chances.",
+    "Weighted picks and Fisher-Yates shuffles keep randomness fair."
+   ],
+   "mistakes": [
+    "Using `math.random(0, #list)`, which can pick index 0 and return `nil`.",
+    "Shuffling with a random sort comparison.",
+    "Expecting `Random.new` to exist outside Roblox."
+   ],
+   "try_it": "Roll two six-sided dice a thousand times and count how often each total from 2 to 12 comes up. Then write a weighted pick between three spooky events with weights 5, 3 and 1, run it a hundred times, and check the counts look right.",
+   "quiz": [
+    {
+     "question": "Which call can return 6?",
+     "choices": [
+      "`math.random()`",
+      "`math.random(1, 5)`",
+      "`math.random(0, 5)`",
+      "`math.random(6)`"
+     ],
+     "answer": 3,
+     "explain": "math.random(6) returns a whole number from 1 to 6 inclusive."
+    },
+    {
+     "question": "What's special about `Random.new(42)`?",
+     "choices": [
+      "It always returns 42",
+      "It produces the same sequence every time",
+      "It only makes even numbers",
+      "It's faster than math.random"
+     ],
+     "answer": 1,
+     "explain": "A fixed seed makes the sequence repeatable."
+    },
+    {
+     "question": "Roughly how often is `math.random() < 0.25` true?",
+     "choices": [
+      "About a quarter of the time",
+      "Never",
+      "Always",
+      "Half the time"
+     ],
+     "answer": 0,
+     "explain": "math.random() is spread evenly from 0 to 1, so it's under 0.25 about 25% of the time."
+    }
+   ]
+  }
+ ]
+}

@@ -1,0 +1,79 @@
+{
+ "id": "test06",
+ "chapter": 6,
+ "title": "The order book",
+ "runner": "edit",
+ "timeout": 25,
+ "story": "The pizzeria keeps tonight's orders as a list of records, each with a `customer` name, a number of `pizzas`, and whether it's been `paid`. The manager wants a module that answers questions about the order book and keeps it up to date.\n\nThe checker builds its own order lists, passes them to your functions, and checks both what you return and what you change.",
+ "create": [
+  "A Folder named `Test06` inside `ServerScriptService.Course`.",
+  "A ModuleScript named `Orders` inside `Test06`, returning a table of functions.",
+  "Every function receives `orders`: an array of records like `{ customer = \"Hill\", pizzas = 2, paid = false }`."
+ ],
+ "requirements": [
+  {
+   "id": "r1",
+   "text": "A ModuleScript named `Orders`."
+  },
+  {
+   "id": "r2",
+   "text": "It returns a table with the functions `totalPizzas`, `unpaidCustomers`, `countByCustomer`, `biggestOrder`, `sortedByPizzas` and `markPaid`."
+  },
+  {
+   "id": "r3",
+   "text": "`totalPizzas(orders)` returns the total number of pizzas, or 0 for an empty list."
+  },
+  {
+   "id": "r4",
+   "text": "`unpaidCustomers(orders)` returns a new array with the customer name of every unpaid order, in the same order as the list."
+  },
+  {
+   "id": "r5",
+   "text": "`countByCustomer(orders)` returns a dictionary from each customer's name to how many orders they placed."
+  },
+  {
+   "id": "r6",
+   "text": "`biggestOrder(orders)` returns the order record with the most pizzas (the record itself, not a copy). On a tie, the earliest one wins. It returns `nil` for an empty list."
+  },
+  {
+   "id": "r7",
+   "text": "`sortedByPizzas(orders)` returns a **new** array of the same records, most pizzas first, with ties ordered alphabetically by customer name. The list it was given must not change. Use `table.sort`."
+  },
+  {
+   "id": "r8",
+   "text": "`markPaid(orders, customer)` sets `paid` to `true` on every order by that customer in the given list, and returns how many orders changed from unpaid to paid."
+  }
+ ],
+ "hints": [
+  "Most of these are a loop over the orders with an accumulator: a number, a new array, or a tally dictionary.",
+  "For biggestOrder, keep track of the best record so far, and only replace it when you find one that's strictly bigger.",
+  "sortedByPizzas should clone the list before sorting. The comparison function needs two cases: different pizza counts, and the same count."
+ ],
+ "static": [
+  {
+   "id": "r1",
+   "type": "exists",
+   "path": "ServerScriptService.Course.Test06.Orders",
+   "class": "ModuleScript",
+   "fail": "Create a ModuleScript named `Orders` inside the `Test06` folder."
+  },
+  {
+   "id": "r7",
+   "type": "uses",
+   "path": "ServerScriptService.Course.Test06.Orders",
+   "pattern": "\\btable\\.sort\\s*\\(",
+   "fail": "Use table.sort with a comparison function for sortedByPizzas."
+  }
+ ],
+ "check": "local path = \"ServerScriptService.Course.Test06.Orders\"\nlocal Orders, info = Course.load(path)\nlocal ok = type(Orders) == \"table\"\nCourse.check(\"r2\", ok, \"Orders should return a table of functions, but it returned \" .. Course.show(Orders) .. (if info.error then \" (\" .. info.error .. \")\" else \"\"))\nlocal names = { \"totalPizzas\", \"unpaidCustomers\", \"countByCustomer\", \"biggestOrder\", \"sortedByPizzas\", \"markPaid\" }\nif ok then\n\tfor _, name in names do\n\t\tCourse.check(\"r2\", type(Orders[name]) == \"function\", \"Orders.\" .. name .. \" should be a function, but it's \" .. Course.show(Orders[name]) .. \".\")\n\tend\nend\nlocal function usable(id, name)\n\tif ok and type(Orders[name]) == \"function\" then\n\t\treturn true\n\tend\n\tCourse.fail(id, \"Not checked: Orders.\" .. name .. \" is missing.\")\n\treturn false\nend\n\nlocal function sample()\n\treturn {\n\t\t{ customer = \"Hill\", pizzas = 2, paid = true },\n\t\t{ customer = \"Vance\", pizzas = 5, paid = false },\n\t\t{ customer = \"Okafor\", pizzas = 3, paid = false },\n\t\t{ customer = \"Hill\", pizzas = 5, paid = false },\n\t\t{ customer = \"Abel\", pizzas = 1, paid = true },\n\t}\nend\n\nif usable(\"r3\", \"totalPizzas\") then\n\tfor _, case in { { sample(), 16 }, { {}, 0 }, { { { customer = \"X\", pizzas = 7, paid = true } }, 7 } } do\n\t\tlocal good, result = Course.call(Orders.totalPizzas, case[1])\n\t\tCourse.check(\"r3\", good and result == case[2], \"totalPizzas should return \" .. case[2] .. \" for a list of \" .. #case[1] .. \" orders, but \" .. (if good then \"returned \" .. Course.show(result) else \"errored: \" .. tostring(result)))\n\tend\nend\n\nif usable(\"r4\", \"unpaidCustomers\") then\n\tlocal good, result = Course.call(Orders.unpaidCustomers, sample())\n\tCourse.check(\"r4\", good and Course.equal(result, { \"Vance\", \"Okafor\", \"Hill\" }), \"unpaidCustomers should return {\\\"Vance\\\", \\\"Okafor\\\", \\\"Hill\\\"} for the sample orders, but \" .. (if good then \"returned \" .. Course.show(result) else \"errored: \" .. tostring(result)))\n\tlocal good2, result2 = Course.call(Orders.unpaidCustomers, {})\n\tCourse.check(\"r4\", good2 and Course.equal(result2, {}), \"unpaidCustomers should return an empty table for no orders, but \" .. (if good2 then \"returned \" .. Course.show(result2) else \"errored: \" .. tostring(result2)))\nend\n\nif usable(\"r5\", \"countByCustomer\") then\n\tlocal good, result = Course.call(Orders.countByCustomer, sample())\n\tCourse.check(\"r5\", good and Course.equal(result, { Hill = 2, Vance = 1, Okafor = 1, Abel = 1 }), \"countByCustomer should return {Abel = 1, Hill = 2, Okafor = 1, Vance = 1}, but \" .. (if good then \"returned \" .. Course.show(result) else \"errored: \" .. tostring(result)))\nend\n\nif usable(\"r6\", \"biggestOrder\") then\n\tlocal orders = sample()\n\tlocal good, result = Course.call(Orders.biggestOrder, orders)\n\tlocal copied = good and type(result) == \"table\" and not rawequal(result, orders[2]) and result.customer == \"Vance\"\n\tCourse.check(\"r6\", good and rawequal(result, orders[2]), if copied\n\t\tthen \"biggestOrder returned a copy of Vance's order. Return the record from the list itself, so changes to it affect the order book.\"\n\t\telse \"biggestOrder should return the first order with the most pizzas (Vance's, the second record itself), but \" .. (if good then \"returned \" .. Course.show(result) else \"errored: \" .. tostring(result)))\n\tlocal good2, result2 = Course.call(Orders.biggestOrder, {})\n\tCourse.check(\"r6\", good2 and result2 == nil, \"biggestOrder should return nil for an empty list, but \" .. (if good2 then \"returned \" .. Course.show(result2) else \"errored: \" .. tostring(result2)))\nend\n\nif usable(\"r7\", \"sortedByPizzas\") then\n\tlocal orders = sample()\n\tlocal before = table.clone(orders)\n\tlocal good, result = Course.call(Orders.sortedByPizzas, orders)\n\tif not good then\n\t\tCourse.fail(\"r7\", \"sortedByPizzas errored: \" .. tostring(result))\n\telseif type(result) ~= \"table\" then\n\t\tCourse.fail(\"r7\", \"sortedByPizzas should return a new table, but returned \" .. Course.show(result))\n\telse\n\t\tlocal customers = {}\n\t\tfor i, order in result do\n\t\t\tcustomers[i] = type(order) == \"table\" and order.customer or Course.show(order)\n\t\tend\n\t\tCourse.check(\"r7\", Course.equal(customers, { \"Hill\", \"Vance\", \"Okafor\", \"Hill\", \"Abel\" }) and rawequal(result[1], before[4]),\n\t\t\t\"sortedByPizzas should order the customers as {\\\"Hill\\\", \\\"Vance\\\", \\\"Okafor\\\", \\\"Hill\\\", \\\"Abel\\\"} (most pizzas first, ties by customer name), but got \" .. Course.show(customers))\n\t\tCourse.check(\"r7\", not rawequal(result, orders), \"sortedByPizzas should return a new table, not the same one it was given.\")\n\t\tlocal unchanged = true\n\t\tfor i = 1, #before do\n\t\t\tif not rawequal(before[i], orders[i]) then\n\t\t\t\tunchanged = false\n\t\t\tend\n\t\tend\n\t\tCourse.check(\"r7\", unchanged and #orders == #before, \"sortedByPizzas changed the order of the list it was given. Sort a copy instead.\")\n\tend\n\tlocal ties = {\n\t\t{ customer = \"Zed\", pizzas = 2, paid = true },\n\t\t{ customer = \"Mia\", pizzas = 2, paid = true },\n\t\t{ customer = \"Abe\", pizzas = 2, paid = true },\n\t\t{ customer = \"Kai\", pizzas = 4, paid = true },\n\t\t{ customer = \"Bo\", pizzas = 2, paid = true },\n\t}\n\tlocal good2, result2 = Course.call(Orders.sortedByPizzas, ties)\n\tlocal names2 = {}\n\tif good2 and type(result2) == \"table\" then\n\t\tfor i, order in result2 do\n\t\t\tnames2[i] = type(order) == \"table\" and order.customer or Course.show(order)\n\t\tend\n\tend\n\tCourse.check(\"r7\", Course.equal(names2, { \"Kai\", \"Abe\", \"Bo\", \"Mia\", \"Zed\" }),\n\t\t\"With four orders tied on 2 pizzas, sortedByPizzas should give {\\\"Kai\\\", \\\"Abe\\\", \\\"Bo\\\", \\\"Mia\\\", \\\"Zed\\\"}, but gave \" .. (if good2 then Course.show(names2) else \"an error: \" .. tostring(result2)))\nend\n\nif usable(\"r8\", \"markPaid\") then\n\tlocal orders = sample()\n\tlocal good, changed = Course.call(Orders.markPaid, orders, \"Hill\")\n\tCourse.check(\"r8\", good and changed == 1, \"markPaid(orders, \\\"Hill\\\") should return 1, since only one of Hill's orders was unpaid, but \" .. (if good then \"returned \" .. Course.show(changed) else \"errored: \" .. tostring(changed)))\n\tCourse.check(\"r8\", orders[4].paid == true and orders[1].paid == true and orders[2].paid == false, \"markPaid should set paid to true on that customer's orders in the list it was given, and leave other customers alone.\")\n\tlocal good2, changed2 = Course.call(Orders.markPaid, orders, \"Nobody\")\n\tCourse.check(\"r8\", good2 and changed2 == 0, \"markPaid for a customer with no orders should return 0, but \" .. (if good2 then \"returned \" .. Course.show(changed2) else \"errored: \" .. tostring(changed2)))\nend\n",
+ "steps": [
+  "In the `Orders` tab, make a module table with the six functions below, and return it at the end.",
+  "Every function receives `orders`, a list of order tables like `{ customer = \"Hill\", pizzas = 2, paid = true }`.",
+  "`totalPizzas(orders)`: add up everyone's pizzas. An empty list gives `0`.",
+  "`unpaidCustomers(orders)`: make a new list of the customer names of orders where paid is `false`, in the same order as the list.",
+  "`countByCustomer(orders)`: make a table from each name to how many orders they placed, like `{ Hill = 2, Vance = 1 }`.",
+  "`biggestOrder(orders)`: return the order with the most pizzas. Return the actual table from the list, not a copy. If two tie, the first one wins. An empty list gives `nil`.",
+  "`sortedByPizzas(orders)`: return a new list, most pizzas first. Orders with the same number of pizzas go alphabetically by customer name. Don't change the original list: copy it with `table.clone`, then sort the copy with `table.sort`.",
+  "`markPaid(orders, customer)`: set paid to `true` on every order from that customer, and return how many of them were unpaid before."
+ ]
+}

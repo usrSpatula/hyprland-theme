@@ -1,0 +1,240 @@
+{
+ "chapter": "py04",
+ "lessons": [
+  {
+   "id": "py04-l1",
+   "title": "for loops and range",
+   "summary": "Repeating code for each item, counting with range, and what a loop variable is.",
+   "minutes": 11,
+   "sections": [
+    {
+     "heading": "Doing something for each thing",
+     "body": "A **for loop** runs a block of code once for each item in a sequence. Each time round (each **iteration**), the **loop variable** holds the next item. A string is a sequence of characters, so you can loop over one straight away. In chapter 6 you'll loop over lists of anything.",
+     "example": {
+      "code": "for letter in \"pizza\":\n    print(letter.upper())",
+      "explain": "Prints P, I, Z, Z and A, one per line."
+     }
+    },
+    {
+     "heading": "range: counting",
+     "body": "`range` makes a sequence of numbers to loop over. It has three forms, and like slices, it **stops before** the end number:",
+     "example": {
+      "code": "for table in range(1, 4):\n    print(f\"Table {table} is ready\")",
+      "explain": "Prints three lines, for tables 1, 2 and 3."
+     },
+     "bullets": [
+      "`range(5)` gives 0, 1, 2, 3, 4. Five numbers, starting at 0.",
+      "`range(1, 6)` gives 1, 2, 3, 4, 5.",
+      "`range(10, 0, -2)` gives 10, 8, 6, 4, 2. The third number is the step, and a negative step counts down."
+     ]
+    },
+    {
+     "heading": "The loop variable is just a variable",
+     "body": "The name after `for` is an ordinary variable that's reassigned at the start of each iteration. Pick a name that describes one item: `for order in orders`, `for letter in word`. If you don't need it, the convention is `_`: `for _ in range(3): print(\"Knock\")`.\n\nAnything indented under the `for` line is the **body** and runs every iteration. The first unindented line after it runs once, after the loop has finished."
+    }
+   ],
+   "key_points": [
+    "`for item in sequence:` runs the body once per item.",
+    "`range(stop)`, `range(start, stop)`, `range(start, stop, step)`. It stops before stop.",
+    "Name the loop variable after one item; use `_` if you don't need it.",
+    "Code after the loop (unindented) runs once, when it's done."
+   ],
+   "mistakes": [
+    "Expecting `range(1, 10)` to include 10.",
+    "Indenting a line that should run once after the loop, so it runs every time.",
+    "Changing the loop variable inside the loop and expecting it to affect the counting."
+   ],
+   "try_it": "Print the numbers 1 to 10, then the even numbers from 2 to 20 using a step, then a countdown from 5 to 1 followed by `Go!`.",
+   "quiz": [
+    {
+     "question": "What does `range(2, 6)` produce?",
+     "choices": [
+      "2, 3, 4, 5, 6",
+      "2, 3, 4, 5",
+      "3, 4, 5, 6",
+      "2, 6"
+     ],
+     "answer": 1,
+     "explain": "It starts at 2 and stops before 6."
+    },
+    {
+     "question": "How many times does `for _ in range(4):` run its body?",
+     "choices": [
+      "3",
+      "4",
+      "5",
+      "Forever"
+     ],
+     "answer": 1,
+     "explain": "range(4) is 0, 1, 2, 3: four numbers, four iterations."
+    },
+    {
+     "question": "What's `range(10, 0, -3)`?",
+     "choices": [
+      "10, 7, 4, 1",
+      "10, 7, 4, 1, 0",
+      "0, 3, 6, 9",
+      "Nothing"
+     ],
+     "answer": 0,
+     "explain": "It counts down by 3 from 10 and stops before reaching 0."
+    }
+   ]
+  },
+  {
+   "id": "py04-l2",
+   "title": "while, break and continue",
+   "summary": "Looping until something changes, leaving early, skipping ahead, and avoiding infinite loops.",
+   "minutes": 11,
+   "sections": [
+    {
+     "heading": "while: repeat while a condition holds",
+     "body": "A **while loop** checks its condition, runs its body if it's true, then goes back and checks again. It keeps going **until the condition is false**. Use it when you don't know in advance how many times you'll need to loop, like \"keep asking until the answer is valid\".\n\nSomething in the body must eventually make the condition false. If nothing does, the loop runs forever, which is called an **infinite loop**. If that happens in a terminal, Ctrl+C stops it.",
+     "example": {
+      "code": "dough = 10\nwhile dough >= 3:\n    dough -= 3\n    print(f\"Made a pizza, {dough} left\")",
+      "explain": "Makes three pizzas (10 to 7 to 4 to 1), then stops because 1 isn't ≥ 3."
+     }
+    },
+    {
+     "heading": "break and continue",
+     "body": "`break` leaves the loop immediately, skipping the rest of the body and any remaining iterations. `continue` skips the rest of **this** iteration and jumps to the next one. Both work in for and while loops.\n\nA common pattern is `while True:` with a `break` inside: loop forever, and leave when something specific happens. It reads naturally for \"keep going until\".",
+     "example": {
+      "code": "for number in range(1, 20):\n    if number % 2 == 0:\n        continue\n    if number > 7:\n        break\n    print(number)",
+      "explain": "Prints 1, 3, 5 and 7. Even numbers are skipped, and the loop ends at 9."
+     }
+    },
+    {
+     "heading": "Choosing for or while",
+     "body": "Use **for** when you're going through a known collection or a known number of steps. Use **while** when you're waiting for a condition to change. If you find yourself writing `i = 0` then `while i < len(something)` and `i += 1`, a for loop is simpler and can't go infinite."
+    }
+   ],
+   "key_points": [
+    "`while condition:` repeats until the condition is false.",
+    "Make sure the body changes something, or it never ends. Ctrl+C stops a runaway program.",
+    "`break` leaves the loop; `continue` skips to the next iteration.",
+    "Prefer for loops when you know how many times; while when you don't."
+   ],
+   "mistakes": [
+    "Forgetting to update the variable in the condition, so the loop never ends.",
+    "Using `break` when you meant `continue`.",
+    "Off-by-one conditions, like `<` where `<=` was needed."
+   ],
+   "try_it": "Write a loop that keeps doubling a number starting at 1 until it's over 1000, printing each value. Then write a `while True` loop that reads lines with `input()` and stops when the line is `stop`.",
+   "quiz": [
+    {
+     "question": "What does `continue` do?",
+     "choices": [
+      "Ends the loop",
+      "Skips to the next iteration",
+      "Restarts the loop from the beginning",
+      "Pauses the program"
+     ],
+     "answer": 1,
+     "explain": "continue skips the rest of the current iteration only."
+    },
+    {
+     "question": "`n = 0` then `while n < 3: print(n)`. What happens?",
+     "choices": [
+      "Prints 0, 1, 2",
+      "Prints 0 forever",
+      "Prints nothing",
+      "Error"
+     ],
+     "answer": 1,
+     "explain": "n never changes, so n < 3 is always true: an infinite loop printing 0."
+    },
+    {
+     "question": "When is a while loop a better fit than a for loop?",
+     "choices": [
+      "Going through every letter of a word",
+      "Repeating exactly 10 times",
+      "Asking again until the user types a valid number",
+      "Never"
+     ],
+     "answer": 2,
+     "explain": "You don't know how many attempts it'll take, so loop while the answer is invalid."
+    }
+   ]
+  },
+  {
+   "id": "py04-l3",
+   "title": "Loop patterns",
+   "summary": "Totals, counting, finding the biggest, building strings, nested loops and enumerate.",
+   "minutes": 12,
+   "sections": [
+    {
+     "heading": "The accumulator",
+     "body": "Most loops build up an answer. Make a variable **before** the loop with a starting value, update it **inside** the loop, and use it **after**. This is called an **accumulator**, and it's how you find totals, counts and averages.",
+     "example": {
+      "code": "total = 0\ncount = 0\nfor price in range(5, 26, 5):\n    total += price\n    count += 1\nprint(total, count, total / count)",
+      "explain": "Adds 5, 10, 15, 20 and 25: prints `75 5 15.0`."
+     }
+    },
+    {
+     "heading": "Finding the biggest (or first)",
+     "body": "To find the largest value, keep track of the best one seen so far and replace it whenever you find a bigger one. Start it at the first value, or at `None` and check for that.\n\nTo find the first item that matches, loop and `break` as soon as you find it. A loop can also have an `else:` block, which runs only if the loop finished **without** a break, which is handy for \"not found\" messages.",
+     "example": {
+      "code": "for number in range(2, 30):\n    if number % 7 == 0 and number % 4 == 0:\n        print(\"Found\", number)\n        break\nelse:\n    print(\"None found\")",
+      "explain": "Prints `Found 28`."
+     }
+    },
+    {
+     "heading": "Nested loops and enumerate",
+     "body": "A loop inside a loop runs its inner body completely for **each** iteration of the outer one. A 3-iteration loop inside a 4-iteration loop runs its body 12 times. That's how you make grids and tables.\n\n`enumerate` gives you a counter alongside each item: `for number, letter in enumerate(word, 1):` gives 1 and the first letter, 2 and the second, and so on.",
+     "example": {
+      "code": "for row in range(1, 4):\n    line = \"\"\n    for column in range(1, 4):\n        line += f\"{row * column:4}\"\n    print(line)",
+      "caption": "A small times table:",
+      "explain": "Each row builds a string in the inner loop, then prints it once."
+     }
+    }
+   ],
+   "key_points": [
+    "Accumulator: start before the loop, update inside, use after.",
+    "Track the best so far to find a maximum or minimum.",
+    "`for ... else` runs the else only when the loop wasn't broken.",
+    "Nested loops multiply; `enumerate` adds a counter."
+   ],
+   "mistakes": [
+    "Resetting the accumulator inside the loop, so it only holds the last value.",
+    "Printing inside the loop when you meant to print once after it.",
+    "Dividing by the count when it might be 0."
+   ],
+   "try_it": "Read 5 numbers with `input()` in a loop and print their total, average and the largest. Then print a 5×5 grid of `*` using nested loops.",
+   "quiz": [
+    {
+     "question": "Where should `total = 0` go when adding up numbers in a loop?",
+     "choices": [
+      "Inside the loop",
+      "Before the loop",
+      "After the loop",
+      "Anywhere"
+     ],
+     "answer": 1,
+     "explain": "Inside, it would reset every iteration. Before the loop, it starts once and builds up."
+    },
+    {
+     "question": "An outer loop runs 4 times and an inner loop runs 5 times. How many times does the inner body run?",
+     "choices": [
+      "9",
+      "5",
+      "20",
+      "4"
+     ],
+     "answer": 2,
+     "explain": "The inner loop runs fully for each outer iteration: 4 × 5 is 20."
+    },
+    {
+     "question": "What does `for i, c in enumerate(\"ab\", 1): print(i, c)` print?",
+     "choices": [
+      "`0 a` and `1 b`",
+      "`1 a` and `2 b`",
+      "`a 1` and `b 2`",
+      "An error"
+     ],
+     "answer": 1,
+     "explain": "The second argument makes enumerate start counting at 1."
+    }
+   ]
+  }
+ ]
+}

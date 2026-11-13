@@ -1,0 +1,239 @@
+{
+ "chapter": "ch13",
+ "lessons": [
+  {
+   "id": "ch13-l1",
+   "title": "DataStores",
+   "summary": "Saving progress between sessions: data stores, keys, and the calls that read and write them.",
+   "minutes": 12,
+   "sections": [
+    {
+     "heading": "Remembering players",
+     "body": "When a server shuts down, everything in it is gone. To keep progress, like coins or unlocked levels, between sessions, Roblox gives the server **DataStores**: cloud storage that lives outside any one server. Only server scripts can use them.\n\n`DataStoreService:GetDataStore(\"PlayerData\")` returns a data store with that name. Inside it, values are saved under **keys**, strings you choose. The usual key for a player is built from their `UserId`, a number that never changes, unlike their name: `\"Player_\" .. player.UserId`."
+    },
+    {
+     "heading": "Reading and writing",
+     "body": "`store:GetAsync(key)` returns the saved value, or `nil` if nothing has been saved yet, which is how you spot a brand new player. `store:SetAsync(key, value)` saves a value, replacing whatever was there. `store:RemoveAsync(key)` deletes it.\n\n`store:UpdateAsync(key, fn)` is the careful version of saving. It calls your function with the **current** saved value, and saves whatever your function returns. Returning `nil` cancels the save. Because you see the old value before replacing it, you can refuse to save data that's older than what's stored, which SetAsync can't do. Most experienced developers use UpdateAsync for player data."
+    },
+    {
+     "heading": "They can fail",
+     "body": "Every one of these calls goes over the internet to Roblox's servers, so each can **fail**: the service can be busy, a request limit can be hit, or the network can hiccup. When that happens, the call errors. So every DataStore call is wrapped in `pcall`, with a plan for what to do when it fails.\n\nThe calls also **yield**, often for a noticeable moment, which is why their names end in Async. Never call them in a tight loop, and never for every small change. Each server has a budget of requests per minute, and spending it carelessly gets requests throttled."
+    },
+    {
+     "heading": "What you can save",
+     "body": "Saved values must be things that can turn into JSON: numbers, strings, booleans, and tables of those. Instances, functions and Roblox types like Vector3 can't be saved directly, so convert them first, for example a position into three numbers.\n\nIn Studio, DataStores only work after you turn on **Enable Studio Access to API Services** in Game Settings, under Security. Studio then uses the real data stores of the published game, so test with a separate data store name if you don't want to touch real players' progress."
+    }
+   ],
+   "key_points": [
+    "DataStores keep data between sessions. Only the server can use them.",
+    "Save per player under a key built from their `UserId`.",
+    "`GetAsync` reads, `SetAsync` overwrites, and `UpdateAsync` sees the old value before saving.",
+    "Every call can fail and yields, so wrap it in `pcall` and use it sparingly."
+   ],
+   "mistakes": [
+    "Using the player's name as the key, which changes if they rename.",
+    "Calling DataStores without `pcall`.",
+    "Trying to save an Instance or Vector3 directly."
+   ],
+   "try_it": "Turn on API access for your baseplate, then write a Script that loads a number for each player, adds one, and saves it when they leave. Rejoin a few times and watch it count your visits.",
+   "quiz": [
+    {
+     "question": "What does `GetAsync` return for a key that's never been saved?",
+     "choices": ["An empty table", "`nil`", "`0`", "It errors"],
+     "answer": 1,
+     "explain": "nil means nothing is saved yet, which is how new players are detected."
+    },
+    {
+     "question": "Why build the key from `UserId` rather than `Name`?",
+     "choices": ["UserId never changes, but names can", "Names can't be strings", "UserId is shorter", "DataStores only accept numbers"],
+     "answer": 0,
+     "explain": "A player can change their name, which would lose their data."
+    },
+    {
+     "question": "What does returning `nil` from an UpdateAsync function do?",
+     "choices": ["Deletes the key", "Saves nil", "Cancels the save", "Errors"],
+     "answer": 2,
+     "explain": "nil means \"don't change anything\", so the save is cancelled."
+    }
+   ]
+  },
+  {
+   "id": "ch13-l2",
+   "title": "Saving safely",
+   "summary": "Session data, retries, defaults for old saves, saving on leave and on shutdown, and never losing progress.",
+   "minutes": 13,
+   "sections": [
+    {
+     "heading": "Load once, keep it in memory",
+     "body": "Reading and writing the DataStore on every change would be slow and burn through the request budget. Instead, load a player's data once when they join, keep it in a table while they play (the **session data**), change that table freely, and save it when they leave.\n\nAll other code reads and changes the session data through a module, never the DataStore directly. That module is the single place that knows how saving works."
+    },
+    {
+     "heading": "Retries, and failing safely",
+     "body": "Because requests sometimes fail for a moment, retry a few times with a short wait between attempts, often waiting a little longer each time. If every attempt fails, **don't** carry on with empty data. A player who starts with zero coins because loading failed would have their real save overwritten by zeros when they leave.\n\nSo a failed load should leave no session data at all, and saving should refuse to run for a player whose data never loaded. It's better to lose one session of new progress than to wipe everything they had."
+    },
+    {
+     "heading": "Defaults and old saves",
+     "body": "A new player gets a **default** table, like zero coins and zero deliveries. And when you add a new field later, every existing save is missing it. So after loading, fill in any missing field from the defaults, a step called **reconciling**. Then the rest of your code can assume every field exists.\n\nBe careful to give each player their own copy of the defaults. If two players share one default table, changing one player's coins changes the other's too, which is chapter 6's reference rule biting.",
+     "example": {
+      "caption": "Filling in missing fields",
+      "code": "local DEFAULTS = { Coins = 0, Deliveries = 0 }\nlocal function reconcile(data)\n\tfor key, value in DEFAULTS do\n\t\tif data[key] == nil then data[key] = value end\n\tend\n\treturn data\nend",
+      "explain": "Old saves gain any new fields, and their existing values are kept."
+     }
+    },
+    {
+     "heading": "Leaving and shutting down",
+     "body": "Save in `PlayerRemoving`, then clear their session data. But when a server shuts down, players are removed all at once and the server may close before every save finishes. `game:BindToClose(fn)` runs `fn` during shutdown and gives it up to about 30 seconds, so save everyone still in the session table there, ideally side by side with `task.spawn`.\n\nPutting the DataStore behind a module also makes it testable: if the module receives the store as a parameter instead of fetching it itself, a test can hand it a fake store that fails on purpose. That idea, passing in what a module depends on, is called **dependency injection**, and the chapter test uses it."
+    }
+   ],
+   "key_points": [
+    "Load once on join, use session data while playing, and save on leave.",
+    "Retry failed requests, but never continue with empty data after a failed load.",
+    "Reconcile loaded data with defaults, and give each player their own copy.",
+    "Save everyone in `BindToClose`. Passing the store in makes the module testable."
+   ],
+   "mistakes": [
+    "Treating a failed load as a new player, then saving zeros over their real progress.",
+    "Sharing one defaults table between players.",
+    "Saving only in PlayerRemoving and losing data when the server shuts down."
+   ],
+   "try_it": "Write a tiny fake store, a table with GetAsync and SetAsync functions that sometimes error on purpose, and write a load function that retries three times and returns false if every attempt fails.",
+   "quiz": [
+    {
+     "question": "Loading a player's data failed three times. What should happen?",
+     "choices": ["Give them default data and carry on as normal", "Kick the server", "Leave them without session data so nothing overwrites their save", "Save defaults immediately"],
+     "answer": 2,
+     "explain": "Saving defaults over a real save would wipe their progress."
+    },
+    {
+     "question": "What does reconciling loaded data do?",
+     "choices": ["Fills in fields missing from older saves using defaults", "Deletes old saves", "Merges two players' data", "Converts data to JSON"],
+     "answer": 0,
+     "explain": "Old saves gain new fields, so later code can rely on them."
+    },
+    {
+     "question": "What's `BindToClose` for?",
+     "choices": ["Closing the player's window", "Running code when a player leaves", "Locking a DataStore", "Giving saves a chance to finish when the server shuts down"],
+     "answer": 3,
+     "explain": "It runs during shutdown so remaining players' data can be saved."
+    }
+   ]
+  },
+  {
+   "id": "ch13-l3",
+   "title": "State machines and game loops",
+   "summary": "Modelling a game as states and transitions, round loops, and reacting to state changes.",
+   "minutes": 12,
+   "sections": [
+    {
+     "heading": "Games have states",
+     "body": "Most games move through clear **states**: waiting for players, intermission, playing, results, back to intermission. A monster is idle, searching or chasing. A delivery is assigned, in progress or done. Writing these down explicitly as a **state machine** turns a tangle of flags into something you can reason about.\n\nA state machine has a current state, a list of allowed **transitions** (from which state to which), and code that runs on entering or leaving a state. Anything not on the transition list simply isn't allowed, which prevents whole categories of bugs, like a round ending before it started."
+    },
+    {
+     "heading": "Transitions as data",
+     "body": "A clean way to write one is a table of allowed transitions: for each state, which states can come next. A function that changes state first checks the table and refuses anything else, returning false so the caller knows.\n\nKeep the current state in one place, and change it in one function. That function is also the natural spot to tell the rest of the game about the change, by calling listeners.",
+     "example": {
+      "caption": "Allowed moves for a door",
+      "code": "local NEXT = { Closed = { Open = true, Locked = true }, Open = { Closed = true }, Locked = { Closed = true } }\nlocal state = \"Closed\"\nlocal function goTo(newState)\n\tif not NEXT[state][newState] then return false end\n\tstate = newState\n\treturn true\nend",
+      "explain": "A locked door can't jump straight to open, because that move isn't listed."
+     }
+    },
+    {
+     "heading": "Telling others about changes",
+     "body": "Other code usually needs to react when the state changes: the UI shows a countdown in intermission, the lights dim when play starts. Rather than each system checking the state constantly, let them **register a callback** that the state machine calls with the old and new state on every change. That's the observer pattern, and it's what Roblox events are built on too.\n\nWith attributes, you get this for free across the network: set a `GameState` attribute on the server, and clients react through `GetAttributeChangedSignal`, exactly as your pizza game does."
+    },
+    {
+     "heading": "Round loops",
+     "body": "A round-based game is usually one loop on the server: intermission with a countdown, start the round, wait until it ends (by time or by winner), show results, repeat. Each step is a state, and the loop moves through them with waits in between.\n\nBuild the loop from small functions, one per phase, and keep the waiting in the loop itself. Then the phases are easy to test on their own, and the loop reads like a description of your game."
+    }
+   ],
+   "key_points": [
+    "A state machine has a current state, allowed transitions, and code on each change.",
+    "Store allowed transitions as data, and refuse anything else.",
+    "Let other code register callbacks for state changes.",
+    "A round loop moves through phases with waits, built from small functions."
+   ],
+   "mistakes": [
+    "Using several booleans that can contradict each other instead of one state.",
+    "Changing the state from many places instead of one function.",
+    "Polling the state every frame instead of reacting to changes."
+   ],
+   "try_it": "Write a state machine for a delivery with the states Assigned, Driving, Delivered and Failed, where only sensible moves are allowed, and print each change through a registered callback.",
+   "quiz": [
+    {
+     "question": "Why store allowed transitions in a table?",
+     "choices": ["So illegal state changes can be refused in one place", "Tables are faster than strings", "Luau requires it", "To save them in a DataStore"],
+     "answer": 0,
+     "explain": "Checking every change against the table blocks impossible moves."
+    },
+    {
+     "question": "What's the benefit of state-change callbacks?",
+     "choices": ["They make the game run faster", "Other systems react exactly when the state changes, without polling", "They prevent all bugs", "They save the state"],
+     "answer": 1,
+     "explain": "Listeners get told about changes instead of repeatedly checking."
+    },
+    {
+     "question": "Three booleans, `isWaiting`, `isPlaying` and `isOver`, are all true at once. What design would prevent that?",
+     "choices": ["More booleans", "A global variable", "One state variable with allowed transitions", "A longer wait"],
+     "answer": 2,
+     "explain": "A single state can only have one value at a time."
+    }
+   ]
+  },
+  {
+   "id": "ch13-l4",
+   "title": "Structuring a whole game",
+   "summary": "Services and controllers, one entry point per side, dependency injection, and cleaning up after yourself.",
+   "minutes": 13,
+   "sections": [
+    {
+     "heading": "One entry point per side",
+     "body": "Large Roblox games usually have **one** server Script and **one** client LocalScript that run by themselves. Everything else is ModuleScripts. The entry point requires the modules and starts them in a known order, so you never wonder whether one system is ready before another uses it.\n\nOn the server, these modules are often called **services** (DataService, OrderService). On the client, **controllers** (HUDController, CameraController). Each has a clear job, a small public surface, and usually a `Start` function the entry point calls."
+    },
+    {
+     "heading": "Responsibilities",
+     "body": "Give each module one responsibility and make it the **only** place that does that job. Only the data service touches DataStores. Only the order service creates and finishes orders. When something goes wrong with orders, there's exactly one module to look at.\n\nModules talk to each other through their public functions, and to the other side through remotes and attributes. If two modules constantly reach into each other's details, the boundary between them is probably in the wrong place."
+    },
+    {
+     "heading": "Dependency injection",
+     "body": "A module that fetches everything it needs itself (DataStores, other services) is hard to test, since it always talks to the real thing. A module that **receives** its dependencies, through a constructor or a `Start` function, can be handed fakes in a test, and real services in the game.\n\nIt also breaks circular requires: instead of two modules requiring each other, the entry point creates both and passes each one what it needs. It costs one extra parameter, and buys you code you can actually test."
+    },
+    {
+     "heading": "Cleaning up",
+     "body": "Every connection, spawned thread and created instance is something that might outlive its purpose. A common pattern is to keep a list of everything a system creates for a player or a round: connections, instances, threads. When the round ends or the player leaves, go through the list, disconnect, cancel and destroy everything, then clear it.\n\nThis habit prevents the slow memory leaks that make long-running servers lag. Pair it with the Developer Console's memory view, opened with F9 in a playtest or live game, to spot systems whose memory only ever grows."
+    }
+   ],
+   "key_points": [
+    "One entry Script per side starts every module in a known order.",
+    "Services on the server and controllers on the client each own one job.",
+    "Pass dependencies in, so modules can be tested with fakes.",
+    "Track what each system creates, and clean it all up when it's done."
+   ],
+   "mistakes": [
+    "Spreading one job across several scripts.",
+    "Modules that fetch their own dependencies and can only be tested live.",
+    "Creating connections per round and never disconnecting them."
+   ],
+   "try_it": "Sketch your pizza game's scripts as services and controllers, and for each one write a single sentence saying what it's responsible for. Then pick one module and change it to receive one of its dependencies as a parameter.",
+   "quiz": [
+    {
+     "question": "Why have a single entry Script on the server?",
+     "choices": ["Roblox only allows one Script", "So modules start in a known order", "Scripts are slower than modules", "To save memory"],
+     "answer": 1,
+     "explain": "One entry point controls when everything starts, so nothing runs before it's ready."
+    },
+    {
+     "question": "What does dependency injection make easier?",
+     "choices": ["Testing a module with fake versions of what it uses", "Writing fewer functions", "Skipping pcall", "Saving faster"],
+     "answer": 0,
+     "explain": "Passing dependencies in lets tests swap in fakes."
+    },
+    {
+     "question": "What's the main risk of never disconnecting per-round connections?",
+     "choices": ["Errors on the client", "DataStore throttling", "Players can't join", "Memory leaks and growing lag over a long session"],
+     "answer": 3,
+     "explain": "Old connections keep running and keep what they captured alive."
+    }
+   ]
+  }
+ ]
+}

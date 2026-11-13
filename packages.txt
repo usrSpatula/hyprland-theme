@@ -1,0 +1,66 @@
+# Arch packages the theme needs, all from the official repos. install.sh installs these.
+
+# Desktop
+hyprland
+xdg-desktop-portal-hyprland
+xdg-desktop-portal-gtk
+waybar
+mako
+libnotify
+swaybg
+wofi
+kitty
+dolphin
+xdg-utils
+
+# Panels (Control Center, notch, game menu, clips, gear tools, Learning)
+python
+python-gobject
+python-cairo
+gtk3
+gtk-layer-shell
+dconf
+
+# Fonts and looks
+inter-font
+noto-fonts
+noto-fonts-emoji
+otf-font-awesome
+woff2-font-awesome
+breeze
+breeze-gtk
+breeze-icons
+
+# Sound, media keys, brightness, network, Bluetooth
+pipewire
+pipewire-pulse
+wireplumber
+libpulse
+playerctl
+brightnessctl
+ddcutil
+networkmanager
+nm-connection-editor
+bluez
+bluez-utils
+
+# Screenshots and clipboard history
+grim
+slurp
+hyprpicker
+wl-clipboard
+cliphist
+
+# Clip recorder
+gpu-screen-recorder
+ffmpeg
+mpv
+gstreamer
+gst-plugins-base
+gst-plugins-good
+gst-plugins-bad
+gst-libav
+gst-plugin-pipewire
+
+# Learning: the languages whose courses can run their tests
+luau
