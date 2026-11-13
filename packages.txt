@@ -13,7 +13,7 @@ kitty
 dolphin
 xdg-utils
 
-# Panels (Control Center, notch, game menu, clips, gear tools, Learning)
+# Panels (Control Center, notch, clips, gear tools)
 python
 python-gobject
 python-cairo
@@ -61,6 +61,3 @@ gst-plugins-good
 gst-plugins-bad
 gst-libav
 gst-plugin-pipewire
-
-# Learning: the languages whose courses can run their tests
-luau

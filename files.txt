@@ -10,14 +10,10 @@
 .config/waybar/style.css
 .config/waybar/notch.py
 .config/waybar/control-center.py
-.config/waybar/game-menu.py
-.config/waybar/game-profiles.json
 .config/waybar/clips.py
+# No button on the bar; clips.py borrows its game detection to name clips
+.config/waybar/game-menu.py
 .config/waybar/gear-tools.py
-.config/waybar/learning.py
-.config/waybar/scripting-progress.py
-.config/waybar/learning/
-.config/waybar/luau-course/
 
 .config/kitty/kitty.conf
 .config/mako/config

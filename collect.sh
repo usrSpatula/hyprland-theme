@@ -4,7 +4,7 @@
 #
 #   ./collect.sh && git add -A && git commit -m "Update theme" && git push
 #
-# files.txt says what gets copied. Backups (*.pre-*, *.bak) and your course progress stay out.
+# files.txt says what gets copied. Backups (*.pre-*, *.bak) stay out.
 set -euo pipefail
 
 repo=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
@@ -21,11 +21,6 @@ while read -r entry; do
     mkdir -p "$theme/$(dirname "$entry")"
     rsync -a --exclude-from="$repo/.gitignore" "$HOME/$entry" "$theme/$entry"
 done < <(grep -vE '^[[:space:]]*(#|$)' "$repo/files.txt")
-
-# A course that's still being written has no course.json yet
-for course in "$theme"/.config/waybar/learning/*/; do
-    [[ -f $course/course.json ]] || rm -rf "$course"
-done
 
 # The repo is shared, so nothing in it should name this PC's user
 if named=$(grep -rIl -e "/home/$USER" -e "$USER@" "$theme"); then

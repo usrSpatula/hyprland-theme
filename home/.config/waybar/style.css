@@ -93,21 +93,8 @@ window#waybar {
     color: #ffffff;
 }
 
-/* Learning button (the cap) */
-#custom-learning {
-    color: #ffffff;
-    font-size: 11px;
-    padding: 0 9px;
-    margin: 2px 1px;
-    border-radius: 5px;
-    transition: background-color 160ms ease-out;
-}
-#custom-learning:hover {
-    background-color: rgba(255, 255, 255, 0.18);
-}
-
-/* Clips and the gear tools (clipboard, screenshots, notes, power): each opens its panel */
-#custom-clips, #custom-clipboard, #custom-screenshots, #custom-notes, #custom-power {
+/* Clips and the gear tools (clipboard, screenshots, power): each opens its panel */
+#custom-clips, #custom-clipboard, #custom-screenshots, #custom-power {
     font-family: "Font Awesome 7 Free Solid";
     font-weight: 900;
     font-size: 12px;
@@ -118,25 +105,8 @@ window#waybar {
     transition: background-color 160ms ease-out, color 160ms ease-out;
 }
 #custom-clips:hover, #custom-clipboard:hover, #custom-screenshots:hover,
-#custom-notes:hover, #custom-power:hover {
+#custom-power:hover {
     background-color: rgba(255, 255, 255, 0.18);
-}
-
-/* Game mod menu button: dim with no game open, blue icon while you're playing */
-#custom-game {
-    color: #ffffff;
-    font-size: 11px;
-    padding: 0 9px;
-    margin: 2px 1px;
-    border-radius: 5px;
-    transition: background-color 160ms ease-out, color 160ms ease-out;
-}
-#custom-game.idle {
-    color: rgba(255, 255, 255, 0.5);
-}
-#custom-game:hover {
-    background-color: rgba(255, 255, 255, 0.18);
-    color: #ffffff;
 }
 
 tooltip {

@@ -85,7 +85,7 @@
         }
     },
 
-    // Gear: click it to slide out the Learning, game menu, clips and gear-tools buttons (icons only), click again to hide them
+    // Gear: click it to slide out the clips and gear-tools buttons (icons only), click again to hide them
     "group/learning": {
         "orientation": "horizontal",
         "drawer": {
@@ -96,17 +96,14 @@
         },
         "modules": [
             "custom/gear",
-            "custom/learning",
-            "custom/game",
             "custom/clips",
             "custom/clipboard",
             "custom/screenshots",
-            "custom/notes",
             "custom/power"
         ]
     },
 
-    // Gear tools (see gear-tools.py): clipboard history, screenshots, quick notes, power menu
+    // Gear tools (see gear-tools.py): clipboard history, screenshots, power menu
     "custom/clipboard": {
         "format": "\uf328",
         "tooltip": false,
@@ -116,11 +113,6 @@
         "format": "\uf302",
         "tooltip": false,
         "on-click": "python3 $HOME/.config/waybar/gear-tools.py --screenshots"
-    },
-    "custom/notes": {
-        "format": "\uf249",
-        "tooltip": false,
-        "on-click": "python3 $HOME/.config/waybar/gear-tools.py --notes"
     },
     "custom/power": {
         "format": "\uf011",
@@ -138,26 +130,6 @@
     "custom/gear": {
         "format": "",
         "tooltip": false
-    },
-
-    // Game mod menu: gamepad icon, bright while a game is open; click for its settings (see game-menu.py)
-    "custom/game": {
-        "exec": "python3 $HOME/.config/waybar/game-menu.py --watch",
-        "return-type": "json",
-        "restart-interval": 5,
-        "tooltip": false,
-        "on-click": "python3 $HOME/.config/waybar/game-menu.py --menu"
-    },
-
-    // Learning: a course for each scripting language, with lessons and auto-marked tests.
-    // The cap opens the language picker (see learning.py)
-    "custom/learning": {
-        "exec": "python3 $HOME/.config/waybar/learning.py",
-        "return-type": "json",
-        "interval": "once",
-        "signal": 9,
-        "tooltip": false,
-        "on-click": "python3 $HOME/.config/waybar/learning.py --hub"
     },
 
     // Starts the black notch, which draws itself in its own window (see notch.py)

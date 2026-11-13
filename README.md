@@ -1,7 +1,7 @@
 # hyprland-theme
 
 A macOS-style Hyprland desktop for Arch Linux: a glass top bar with a notch, a Control Center,
-a Spotlight-style launcher, a clip recorder, a game menu and a Learning panel with coding courses.
+a Spotlight-style launcher and a clip recorder.
 
 ## Install
 
@@ -68,8 +68,8 @@ The clip recorder records the monitor named in `CLIP_MONITOR` at the top of
 | Super + Insert | Turn clip recording on or off |
 | Super + M | Log out |
 
-On the bar: the clock opens the Control Center, and the gear slides out Learning, the game menu,
-clips, clipboard history, screenshots, notes and the power menu.
+On the bar: the clock opens the Control Center, and the gear slides out clips, clipboard
+history, screenshots and the power menu.
 
 ## What's in here
 
@@ -93,11 +93,10 @@ git commit -m "Update theme"
 git push
 ```
 
-`collect.sh` leaves out backup files (`*.pre-*`, `*.bak`) and your course progress.
+`collect.sh` leaves out backup files (`*.pre-*`, `*.bak`).
 If you add a new file to the theme, add its path to `files.txt` first.
 
 ## Extras
 
-- The Learning panel runs your code on your own PC. Luau and Python work out of the box.
 - Bluetooth in the Control Center needs the service running: `sudo systemctl enable --now bluetooth`.
 - Brightness for external monitors uses `ddcutil`, which needs monitors that support DDC/CI.
