@@ -105,17 +105,17 @@
 
     // Gear tools (see gear-tools.py): clipboard history, screenshots, power menu
     "custom/clipboard": {
-        "format": "\uf328",
+        "format": " ",
         "tooltip": false,
         "on-click": "python3 $HOME/.config/waybar/gear-tools.py --clipboard"
     },
     "custom/screenshots": {
-        "format": "\uf302",
+        "format": " ",
         "tooltip": false,
         "on-click": "python3 $HOME/.config/waybar/gear-tools.py --screenshots"
     },
     "custom/power": {
-        "format": "\uf011",
+        "format": " ",
         "tooltip": false,
         "on-click": "python3 $HOME/.config/waybar/gear-tools.py --power"
     },
@@ -123,12 +123,12 @@
     // Clips (see clips.py): the film opens the clips panel, with the recording on/off switch
     // (Super+Insert) at the top and every clip below, newest first. Insert saves the last 30 seconds
     "custom/clips": {
-        "format": "",
+        "format": " ",
         "tooltip": false,
         "on-click": "python3 $HOME/.config/waybar/clips.py --browser"
     },
     "custom/gear": {
-        "format": "",
+        "format": " ",
         "tooltip": false
     },
 

@@ -92,11 +92,6 @@ window#waybar {
 
 /* Gear that opens the scripting progress and Luau course drawer */
 #custom-gear {
-    font-family: "Font Awesome 7 Free Solid";
-    font-weight: 900;
-    font-size: 12px;
-    color: rgba(255, 255, 255, 0.75);
-    padding: 0 8px;
     margin: 2px 1px;
     border-radius: 5px;
     transition: background-color 160ms ease-out, color 160ms ease-out;
@@ -108,11 +103,6 @@ window#waybar {
 
 /* Clips and the gear tools (clipboard, screenshots, power): each opens its panel */
 #custom-clips, #custom-clipboard, #custom-screenshots, #custom-power {
-    font-family: "Font Awesome 7 Free Solid";
-    font-weight: 900;
-    font-size: 12px;
-    color: #ffffff;
-    padding: 0 8px;
     margin: 2px 1px;
     border-radius: 5px;
     transition: background-color 160ms ease-out, color 160ms ease-out;
@@ -167,50 +157,64 @@ tooltip label {
     background-color: #ffffff;
 }
 
+/* The gear drawer's icons are pictures too (made from the icon font), so they can grow smoothly */
+#custom-gear, #custom-clips, #custom-clipboard, #custom-screenshots, #custom-power {
+    font-size: 1px;
+    min-width: 16px;
+    padding: 0 8px;
+    background-repeat: no-repeat;
+    background-position: center;
+    background-size: 16px 16px;
+}
+#custom-gear        { background-image: url("icons/gear.svg"); opacity: 0.75; }
+#custom-gear:hover  { opacity: 1; }
+#custom-clips       { background-image: url("icons/clips.svg"); }
+#custom-clipboard   { background-image: url("icons/clipboard.svg"); }
+#custom-screenshots { background-image: url("icons/screenshots.svg"); }
+#custom-power       { background-image: url("icons/power.svg"); }
+
 /* ---- Bounce ----
-   Icons swell and settle under the mouse, and jump when what they show changes */
+   Icons swell and settle under the mouse, and jump when what they show changes.
+   Growing a picture is what makes the motion smooth, but a small picture stretched bigger is
+   blurry. So each icon has a second file drawn at the hover size (the "-big" ones), and
+   hovering swaps to it: the icon is sharp both at rest and once it has grown. All the sizes
+   are even numbers, which keeps them on whole pixels in the bar */
 @keyframes icon-hover {
     0%   { background-size: 18px 18px; }
     40%  { background-size: 24px 24px; }
-    70%  { background-size: 19px 19px; }
+    70%  { background-size: 21px 21px; }
     100% { background-size: 22px 22px; }
 }
-@keyframes search-hover {
+@keyframes small-hover {
     0%   { background-size: 16px 16px; }
     40%  { background-size: 22px 22px; }
-    70%  { background-size: 17px 17px; }
+    70%  { background-size: 19px 19px; }
     100% { background-size: 20px 20px; }
 }
-#bluetooth, #pulseaudio, #network, #custom-search {
+#bluetooth, #pulseaudio, #network, #custom-search,
+#custom-gear, #custom-clips, #custom-clipboard, #custom-screenshots, #custom-power {
     transition: background-color 160ms ease-out, background-size 180ms ease-out, opacity 200ms ease-out;
 }
 #bluetooth:hover, #pulseaudio:hover, #network:hover {
     background-size: 22px 22px;
     animation: icon-hover 420ms ease-out;
 }
-#custom-search:hover {
-    background-size: 20px 20px;
-    animation: search-hover 420ms ease-out;
-}
-
-/* The gear drawer's icons are letters from an icon font, so those grow by font size.
-   The padding shrinks by the same amount, which keeps their neighbours still */
-@keyframes glyph-hover {
-    0%   { font-size: 12px; padding: 0 8px; }
-    40%  { font-size: 17px; padding: 0 5px; }
-    70%  { font-size: 13px; padding: 0 7px; }
-    100% { font-size: 15px; padding: 0 6px; }
-}
-#custom-gear, #custom-clips, #custom-clipboard, #custom-screenshots, #custom-power {
-    transition: background-color 160ms ease-out, color 160ms ease-out,
-                font-size 180ms ease-out, padding 180ms ease-out;
-}
-#custom-gear:hover, #custom-clips:hover, #custom-clipboard:hover,
+#custom-search:hover, #custom-gear:hover, #custom-clips:hover, #custom-clipboard:hover,
 #custom-screenshots:hover, #custom-power:hover {
-    font-size: 15px;
-    padding: 0 6px;
-    animation: glyph-hover 420ms ease-out;
+    background-size: 20px 20px;
+    animation: small-hover 420ms ease-out;
 }
+#pulseaudio:hover         { background-image: url("icons/volume-big.svg"); }
+#pulseaudio.muted:hover   { background-image: url("icons/volume-muted-big.svg"); }
+#bluetooth:hover          { background-image: url("icons/bluetooth-big.svg"); }
+#network:hover            { background-image: url("icons/wifi-big.svg"); }
+#network.ethernet:hover   { background-image: url("icons/ethernet-big.svg"); }
+#custom-search:hover      { background-image: url("icons/search-big.svg"); }
+#custom-gear:hover        { background-image: url("icons/gear-big.svg"); }
+#custom-clips:hover       { background-image: url("icons/clips-big.svg"); }
+#custom-clipboard:hover   { background-image: url("icons/clipboard-big.svg"); }
+#custom-screenshots:hover { background-image: url("icons/screenshots-big.svg"); }
+#custom-power:hover       { background-image: url("icons/power-big.svg"); }
 
 /* A change of state: the icon jumps. Each state has its own copy of the animation,
    because one only plays again when its name changes */
