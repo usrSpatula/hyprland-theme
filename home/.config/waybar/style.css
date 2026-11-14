@@ -32,8 +32,9 @@ window#waybar {
     border-radius: 5px;
 }
 
-/* The Arch logo at the left end (white, from the system's own logo file). The module keeps
-   its old "apple" name from when this was an Apple logo */
+/* The Arch logo at the left end (white, from the system's own logo file). It's decoration:
+   nothing happens on hover or click. The module keeps its old "apple" name from when this
+   was an Apple logo */
 #custom-apple {
     font-size: 1px;
     min-width: 16px;
@@ -42,12 +43,6 @@ window#waybar {
     background-repeat: no-repeat;
     background-position: center;
     background-size: 16px 16px;
-    transition: background-color 160ms ease-out, background-size 180ms ease-out;
-}
-#custom-apple:hover {
-    background-image: url("icons/arch-big.svg");
-    background-size: 20px 20px;
-    animation: small-hover 420ms ease-out;
 }
 
 /* App name is bold */
@@ -89,7 +84,6 @@ window#waybar {
 }
 
 /* macOS-style hover highlight */
-#custom-apple:hover,
 #bluetooth:hover,
 #pulseaudio:hover,
 #network:hover,

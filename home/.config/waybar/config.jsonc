@@ -23,8 +23,7 @@
 
     "custom/apple": {
         "format": " ",
-        "tooltip": false,
-        "on-click": "wofi --show drun"
+        "tooltip": false
     },
 
     // App name in bold, like macOS (shows the focused app's class)
