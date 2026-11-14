@@ -4,6 +4,7 @@
 .config/hypr/hyprland.lua
 .config/hypr/screenshot.sh
 .config/hypr/share-picker.sh
+.config/hypr/screenshot-flash.py
 .config/hypr/wallpaper.jpg
 
 .config/waybar/config.jsonc
@@ -14,6 +15,7 @@
 # No button on the bar; clips.py borrows its game detection to name clips
 .config/waybar/game-menu.py
 .config/waybar/gear-tools.py
+.config/waybar/sounds/
 
 .config/kitty/kitty.conf
 .config/mako/config
@@ -22,3 +24,4 @@
 
 .local/bin/mac-osd
 .local/bin/spotlight-launcher
+.local/bin/ui-sound

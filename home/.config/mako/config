@@ -32,6 +32,9 @@ ignore-timeout=0
 max-visible=4
 sort=-time
 
+# A soft chime when a notification arrives (the Sounds switch in the Control Center mutes it)
+on-notify=exec ~/.local/bin/ui-sound notify
+
 [urgency=low]
 border-color=#ffffff1f
 
@@ -41,6 +44,7 @@ default-timeout=0
 
 # Volume display from mac-osd: compact, white bar, stays out of notification history
 [app-name=osd]
+on-notify=none
 width=240
 progress-color=over #ffffffcc
 history=0
@@ -49,6 +53,7 @@ history=0
 # but keep the volume display
 [mode=do-not-disturb]
 invisible=1
+on-notify=none
 
 [mode=do-not-disturb app-name=osd]
 invisible=0
@@ -56,6 +61,7 @@ invisible=0
 # "No Alerts" from the game menu, on only while that game is focused
 [mode=game]
 invisible=1
+on-notify=none
 
 [mode=game app-name=osd]
 invisible=0
@@ -66,3 +72,10 @@ invisible=0
 
 [mode=game app-name=clips]
 invisible=0
+
+# Screenshots and saved clips play their own sound, so they skip the chime
+[app-name=screenshot]
+on-notify=none
+
+[app-name=clips]
+on-notify=none

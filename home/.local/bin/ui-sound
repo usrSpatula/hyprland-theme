@@ -1,0 +1,14 @@
+#!/bin/sh
+# Plays one of the theme's interface sounds: ui-sound open | close | on | off | volume | notify | clip | screenshot
+# The sounds are in ~/.config/waybar/sounds. The Sounds switch in the Control Center turns them
+# off by creating the file checked below.
+
+[ -e "${XDG_STATE_HOME:-$HOME/.local/state}/ui-sounds-off" ] && exit 0
+file="$HOME/.config/waybar/sounds/$1.wav"
+[ -f "$file" ] || exit 0
+
+if command -v pw-play >/dev/null; then
+    pw-play "$file" >/dev/null 2>&1 &
+else
+    paplay "$file" >/dev/null 2>&1 &
+fi

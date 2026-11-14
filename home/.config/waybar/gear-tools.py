@@ -62,6 +62,7 @@ entry.search {
 entry.search:focus { border-color: #0a84ff; }
 .item { padding: 7px 8px; transition: background-color 140ms ease-out; }
 .item.hover { background-color: rgba(255, 255, 255, 0.12); }
+.item.pressed, .shot.pressed, .power-row.pressed { background-color: rgba(255, 255, 255, 0.05); }
 .item-text { font-size: 11px; }
 .item-sub { font-size: 10px; color: rgba(255, 255, 255, 0.5); }
 button.flat.pinned .trash { color: #ffd60a; }
@@ -201,6 +202,7 @@ class Parts:
 
         area.connect("enter-notify-event", on_hover, True)
         area.connect("leave-notify-event", on_hover, False)
+        self.cc.press_feedback(area, content)
         if on_click:
             area.connect("button-release-event", lambda _a, e: e.button == 1 and on_click())
         return area

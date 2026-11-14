@@ -269,6 +269,8 @@ class Recorders:
         saved.rename(target)
         thumb, _ = clip_info(target)
         notify("Clip saved", f"{label}  ·  last {length_name(seconds)}", thumb)
+        subprocess.Popen([str(Path.home() / ".local/bin/ui-sound"), "clip"],
+                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
     def write_status(self):
         status = {"installed": bool(shutil.which(RECORDER)),
@@ -385,6 +387,7 @@ BROWSER_CSS = b"""
 .note { font-size: 10px; color: rgba(255, 255, 255, 0.45); margin: 0 4px; }
 .clip-row { padding: 7px; transition: background-color 140ms ease-out; }
 .clip-row.hover { background-color: rgba(255, 255, 255, 0.12); }
+.clip-row.pressed { background-color: rgba(255, 255, 255, 0.05); }
 .clip-name { font-size: 12px; font-weight: 600; }
 .clip-sub { font-size: 10px; color: rgba(255, 255, 255, 0.55); }
 .trash { font-size: 11px; color: rgba(255, 255, 255, 0.55); }
@@ -939,6 +942,7 @@ def open_panel(app, cc, build, width, extra_css):
         for timer in timers:
             GLib.source_remove(timer)
         cleanup()
+        cc.sound("close")
         revealer.set_transition_duration(cc.CLOSE_DURATION)
         revealer.set_reveal_child(False)
         GLib.timeout_add(cc.CLOSE_DURATION + 30, window.destroy)
@@ -969,7 +973,7 @@ def open_panel(app, cc, build, width, extra_css):
     window.connect("key-press-event", lambda _w, e: e.keyval == Gdk.KEY_Escape
                    and not getattr(panel, "cancel_edit", lambda: False)() and close())
     window.connect("map-event", lambda *_: (revealer.set_reveal_child(True),
-                                            cc.spring_in(revealer, cc.BAR_HEIGHT)))
+                                            cc.spring_in(revealer, cc.BAR_HEIGHT), cc.sound("open")))
     window.show_all()
     return close
 

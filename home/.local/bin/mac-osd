@@ -11,6 +11,11 @@ case "$1" in
     mute) wpctl set-mute "$sink" toggle ;;
 esac
 
+# A soft tick at the new volume, like macOS
+case "$1" in
+    up|down) "$HOME/.local/bin/ui-sound" volume ;;
+esac
+
 status=$(wpctl get-volume "$sink")
 percent=$(awk '{ printf "%.0f", $2 * 100 }' <<< "$status")
 

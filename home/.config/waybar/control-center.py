@@ -6,10 +6,12 @@
 import calendar
 import datetime
 import math
+import os
 import re
 import subprocess
 import sys
 import threading
+from pathlib import Path
 from urllib.parse import unquote, urlparse
 
 import gi
@@ -33,6 +35,8 @@ SCROLL_STEP = 5
 NIGHT_TEMPERATURE = 4500
 REFRESH_SECONDS = 2
 BLUE = "#0a84ff"
+# ui-sound stays quiet while this file exists (the Sounds switch)
+SOUNDS_OFF = Path(os.environ.get("XDG_STATE_HOME") or Path.home() / ".local/state") / "ui-sounds-off"
 
 ICON_FONT = "Font Awesome 7 Free Solid"
 BRAND_FONT = "Font Awesome 7 Brands"
@@ -69,8 +73,10 @@ window { background-color: transparent; }
     border-radius: 14px;
     padding: 10px;
 }
-.toggle { transition: background-color 140ms ease-out; }
-.toggle.hover { background-color: rgba(255, 255, 255, 0.12); }
+/* Tiles lift under the mouse and press in when clicked */
+.toggle { transition: background-color 140ms ease-out, box-shadow 140ms ease-out; }
+.toggle.hover { background-color: rgba(255, 255, 255, 0.12); box-shadow: 0 4px 12px rgba(0, 0, 0, 0.28); }
+.toggle.pressed { background-color: rgba(255, 255, 255, 0.04); box-shadow: none; }
 
 .time { font-family: "Inter Display"; font-size: 40px; font-weight: 300; }
 .ampm { font-family: "Inter Display"; font-size: 17px; font-weight: 400;
@@ -106,6 +112,7 @@ button.flat {
     transition: background-color 140ms ease-out;
 }
 button.flat:hover { background-color: rgba(255, 255, 255, 0.12); }
+button.flat:active { background-color: rgba(255, 255, 255, 0.05); }
 .arrow { font-size: 9px; color: rgba(255, 255, 255, 0.7); }
 
 .circle {
@@ -117,6 +124,7 @@ button.flat:hover { background-color: rgba(255, 255, 255, 0.12); }
     transition: background-color 160ms ease-out;
 }
 button.circle:hover { background-color: rgba(255, 255, 255, 0.22); }
+button.circle:active { background-color: rgba(255, 255, 255, 0.08); }
 .circle.on, button.circle.on:hover { background-color: #0a84ff; }
 .tile-title { font-size: 12px; font-weight: 600; }
 .tile-sub { font-size: 10px; color: rgba(255, 255, 255, 0.55); }
@@ -148,6 +156,23 @@ def run(*command):
 def spawn(*command):
     subprocess.Popen(command, start_new_session=True,
                      stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+
+def sound(name):
+    """Plays an interface sound (see ~/.local/bin/ui-sound). Silent if the script is missing."""
+    try:
+        spawn(os.path.expanduser("~/.local/bin/ui-sound"), name)
+    except OSError:
+        pass
+
+
+def press_feedback(area, target):
+    """Gives target the "pressed" class while the mouse button is held on area."""
+    area.add_events(Gdk.EventMask.BUTTON_PRESS_MASK | Gdk.EventMask.BUTTON_RELEASE_MASK
+                    | Gdk.EventMask.LEAVE_NOTIFY_MASK)
+    area.connect("button-press-event", lambda *_: set_class(target, "pressed", True))
+    area.connect("button-release-event", lambda *_: set_class(target, "pressed", False))
+    area.connect("leave-notify-event", lambda *_: set_class(target, "pressed", False))
 
 
 def icon_label(name, css_class=None, font=ICON_FONT):
@@ -210,6 +235,19 @@ def set_dnd(on):
     run("makoctl", "mode", "-a" if on else "-r", "do-not-disturb")
 
 
+def sounds_state():
+    on = not SOUNDS_OFF.exists()
+    return on, "On" if on else "Off"
+
+
+def set_sounds(on):
+    if on:
+        SOUNDS_OFF.unlink(missing_ok=True)
+    else:
+        SOUNDS_OFF.parent.mkdir(parents=True, exist_ok=True)
+        SOUNDS_OFF.touch()
+
+
 def night_state():
     on = bool(run("pgrep", "-x", "hyprsunset").strip())
     return on, "Warm screen" if on else "Off"
@@ -249,6 +287,11 @@ class Toggle:
 
     def flip(self, *_):
         target = not self.on
+        if self.write is set_sounds:
+            # Turning sounds off stays silent; turning them on is heard once the switch is written
+            GLib.timeout_add(120, lambda: sound("on") and False)
+        else:
+            sound("on" if target else "off")
         set_class(self.icon_holder, "on", target)
         self.on = target
         self.flipping = True
@@ -533,6 +576,7 @@ def toggle_tile(icon, title, read, write, on_tile_click=None, font=ICON_FONT):
         if event.detail != Gdk.NotifyType.INFERIOR:
             set_class(tile, "hover", inside)
 
+    press_feedback(area, tile)
     area.connect("button-release-event", on_click)
     area.connect("enter-notify-event", on_hover, True)
     area.connect("leave-notify-event", on_hover, False)
@@ -657,6 +701,10 @@ def build_panel(close):
         tile, toggle = toggle_tile(icon, title, read, write, on_tile_click, font)
         grid.attach(tile, index % 2, index // 2, 1, 1)
         toggles.append(toggle)
+    # Interface sounds, across the bottom of the grid
+    tile, toggle = toggle_tile("music", "Sounds", sounds_state, set_sounds)
+    grid.attach(tile, 0, 2, 2, 1)
+    toggles.append(toggle)
     panel.pack_start(grid, False, False, 0)
 
     # Display: both monitors move together
@@ -745,6 +793,7 @@ def open_window(app):
         if state["closing"]:
             return
         state["closing"] = True
+        sound("close")
         revealer.set_transition_duration(CLOSE_DURATION)
         revealer.set_reveal_child(False)
         GLib.timeout_add(CLOSE_DURATION + 30, window.destroy)
@@ -769,7 +818,8 @@ def open_window(app):
     window.add_events(Gdk.EventMask.BUTTON_PRESS_MASK)
     window.connect("button-press-event", close)
     window.connect("key-press-event", lambda _w, e: e.keyval == Gdk.KEY_Escape and close())
-    window.connect("map-event", lambda *_: (revealer.set_reveal_child(True), spring_in(revealer, BAR_HEIGHT)))
+    window.connect("map-event", lambda *_: (revealer.set_reveal_child(True), spring_in(revealer, BAR_HEIGHT),
+                                            sound("open")))
     window.show_all()
     return close
 

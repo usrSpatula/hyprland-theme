@@ -79,7 +79,7 @@ while read -r entry; do
     note "~/$path"
 done < <(list "$repo/files.txt")
 
-chmod +x "$HOME/.local/bin/mac-osd" "$HOME/.local/bin/spotlight-launcher" \
+chmod +x "$HOME/.local/bin/mac-osd" "$HOME/.local/bin/spotlight-launcher" "$HOME/.local/bin/ui-sound" \
          "$HOME/.config/hypr/screenshot.sh" "$HOME/.config/hypr/share-picker.sh"
 
 # The screen-share portal wants the picker's full path, which has your user name in it,

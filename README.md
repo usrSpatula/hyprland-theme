@@ -71,6 +71,10 @@ The clip recorder records the monitor named in `CLIP_MONITOR` at the top of
 On the bar: the clock opens the Control Center, and the gear slides out clips, clipboard
 history, screenshots and the power menu.
 
+The theme has soft interface sounds (panels, switches, screenshots, clips, notifications, volume).
+The **Sounds** switch in the Control Center turns them off. To change a sound, edit
+`~/.config/waybar/sounds/make-sounds.py` and run it.
+
 ## What's in here
 
 | Path | What it is |

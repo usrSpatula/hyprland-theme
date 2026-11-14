@@ -17,5 +17,11 @@ sleep 0.15
 
 region=$(slurp -b 00000066 -c ffffffcc -s ffffff10 -w 1) || exit 0
 grim -g "$region" "$file" || exit 1
+
+# Unfreeze, then a shutter sound and a white flash over what was captured
+kill "$freeze" 2>/dev/null
+"$HOME/.local/bin/ui-sound" screenshot
+python3 "$HOME/.config/hypr/screenshot-flash.py" "$region" >/dev/null 2>&1 &
+
 wl-copy < "$file"
-notify-send -i "$file" "Screenshot" "Saved and copied to clipboard"
+notify-send -a screenshot -i "$file" "Screenshot" "Saved and copied to clipboard"

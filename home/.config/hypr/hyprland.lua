@@ -621,6 +621,14 @@ pcall(function()
         no_anim = true,
     })
 end)
+-- The screenshot flash (screenshot-flash.py) fades by itself
+pcall(function()
+    hl.layer_rule({
+        name    = "screenshot-flash-no-anim",
+        match   = { namespace = "^screenshot-flash$" },
+        no_anim = true,
+    })
+end)
 -- The screenshot freeze (screenshot.sh) has to appear instantly, not fade in
 pcall(function()
     hl.layer_rule({
