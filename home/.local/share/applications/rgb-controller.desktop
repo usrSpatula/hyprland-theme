@@ -2,7 +2,7 @@
 Type=Application
 Name=RGB Controller
 Comment=Change the colour and effect of every light in the PC
-Exec=sh -c "exec \"$HOME/.local/bin/rgb-controller\""
+Exec=sh -c "exec ~/.local/bin/rgb-controller"
 Icon=preferences-desktop-color
 Categories=Settings;HardwareSettings;
 StartupWMClass=rgb-controller
