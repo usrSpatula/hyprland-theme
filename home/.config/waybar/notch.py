@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# The black notch: hover it and it grows into a square menu of audio controls.
+# The black notch: it swells a little under the mouse, and a click grows it into a square menu of audio controls.
 # Waybar starts this once per bar, so extra copies wait on a lock and only one runs.
 import fcntl
 import math
@@ -29,6 +29,7 @@ MAX_STEP_SECONDS = 1 / 30
 CONTENT_FADE_START = 0.4
 PULSE_GROW = (26, 7)    # px the closed notch swells by when something happens
 PULSE_SECONDS = 0.75
+HOVER_GROW = (14, 4)    # px the closed notch swells by under the mouse, to show it can be clicked
 MAX_ART_BYTES = 5_000_000
 RUNTIME_DIR = Path(os.environ.get("XDG_RUNTIME_DIR", "/tmp"))
 MUSIC_ICON = ""
@@ -196,6 +197,11 @@ class Notch:
         self.last_frame = None
         self.close_timer = None
         self.pulsing = False
+        self.hovering = False
+        self.hover_fraction = 0
+        self.hover_velocity = 0
+        self.hover_tick = None
+        self.hover_last = None
 
         self.window = Gtk.Window()
         self.window.set_visual(self.window.get_screen().get_rgba_visual())
@@ -232,7 +238,9 @@ class Notch:
         self.window.add(self.root)
         self.set_surface_size(False)
 
-        self.window.add_events(Gdk.EventMask.ENTER_NOTIFY_MASK | Gdk.EventMask.LEAVE_NOTIFY_MASK)
+        self.window.add_events(Gdk.EventMask.ENTER_NOTIFY_MASK | Gdk.EventMask.LEAVE_NOTIFY_MASK
+                               | Gdk.EventMask.BUTTON_PRESS_MASK)
+        self.window.connect("button-press-event", self.on_click)
         self.window.connect("enter-notify-event", self.on_enter)
         self.window.connect("leave-notify-event", self.on_leave)
         self.window.show_all()
@@ -291,7 +299,7 @@ class Notch:
     def pulse(self):
         """Swells the closed notch and lets it settle with a bounce: a new song started,
         or a clip was saved."""
-        if self.is_open or self.tick is not None or self.pulsing:
+        if self.is_open or self.tick is not None or self.pulsing or self.hover_tick is not None:
             return
         self.pulsing = True
         # The window is only as big as the closed notch, so it needs room to swell into
@@ -347,9 +355,10 @@ class Notch:
             self.fraction = target
             self.velocity = 0
 
+        idle = self.idle_size()
         self.panel.set_size_request(
-            round(IDLE_SIZE[0] + (OPEN_SIZE[0] - IDLE_SIZE[0]) * self.fraction),
-            round(IDLE_SIZE[1] + (OPEN_SIZE[1] - IDLE_SIZE[1]) * self.fraction),
+            round(idle[0] + (OPEN_SIZE[0] - idle[0]) * self.fraction),
+            round(idle[1] + (OPEN_SIZE[1] - idle[1]) * self.fraction),
         )
         # The cover and buttons fade with the size, in both directions
         if self.fraction > CONTENT_FADE_START:
@@ -362,10 +371,58 @@ class Notch:
 
         if self.fraction != target:
             return True
-        if not self.is_open:
+        if not self.is_open and self.hover_tick is None:
             self.set_surface_size(False)
         self.tick = None
         return False
+
+    def idle_size(self):
+        """The closed notch's size: a little bigger while the mouse is on it."""
+        return (IDLE_SIZE[0] + HOVER_GROW[0] * self.hover_fraction,
+                IDLE_SIZE[1] + HOVER_GROW[1] * max(self.hover_fraction, 0))
+
+    def set_hover(self, hovering):
+        self.hovering = hovering
+        if hovering and not self.is_open and self.tick is None:
+            # The window is only as big as the closed notch, so it needs room to swell into
+            width = IDLE_SIZE[0] + PULSE_GROW[0] + 2 * SHOULDER_WIDTH
+            height = IDLE_SIZE[1] + PULSE_GROW[1]
+            self.root.set_size_request(width, height)
+            self.window.resize(width, height)
+        if self.hover_tick is None:
+            self.hover_last = None
+            self.hover_tick = self.panel.add_tick_callback(self.hover_step)
+
+    def hover_step(self, _widget, clock):
+        now = clock.get_frame_time()
+        elapsed = (now - self.hover_last) / 1_000_000 if self.hover_last else FRAME_SECONDS
+        self.hover_last = now
+        elapsed = min(elapsed, MAX_STEP_SECONDS)
+        # Once the notch is open the swell eases away underneath it
+        target = 1 if self.hovering and not self.is_open else 0
+        # A springy swell: it goes a touch too far and settles
+        pull = 700 * (target - self.hover_fraction) - 26 * self.hover_velocity
+        self.hover_velocity += pull * elapsed
+        self.hover_fraction += self.hover_velocity * elapsed
+        settled = abs(target - self.hover_fraction) < 0.01 and abs(self.hover_velocity) < 0.1
+        if settled:
+            self.hover_fraction, self.hover_velocity = target, 0
+        if not self.is_open and self.tick is None and not self.pulsing:
+            width, height = self.idle_size()
+            self.panel.set_size_request(round(width), round(height))
+        if not settled:
+            return True
+        self.hover_tick = None
+        if target == 0 and not self.is_open and self.tick is None and not self.pulsing:
+            self.set_surface_size(False)
+        return False
+
+    def on_click(self, _window, event):
+        # A click opens the notch. Once open, a click on its background closes it again
+        # (the buttons inside keep their own clicks)
+        if event.button == 1:
+            self.set_open(not self.is_open)
+        return True
 
     def on_enter(self, _window, event):
         if event.detail == Gdk.NotifyType.INFERIOR:
@@ -373,12 +430,14 @@ class Notch:
         if self.close_timer:
             GLib.source_remove(self.close_timer)
             self.close_timer = None
-        self.set_open(True)
+        self.set_hover(True)
 
     def on_leave(self, _window, event):
-        if event.detail == Gdk.NotifyType.INFERIOR or self.close_timer:
+        if event.detail == Gdk.NotifyType.INFERIOR:
             return
-        self.close_timer = GLib.timeout_add(CLOSE_DELAY_MS, self.close_after_delay)
+        self.set_hover(False)
+        if self.is_open and not self.close_timer:
+            self.close_timer = GLib.timeout_add(CLOSE_DELAY_MS, self.close_after_delay)
 
     def close_after_delay(self):
         self.close_timer = None
