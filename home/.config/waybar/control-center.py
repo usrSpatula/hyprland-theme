@@ -73,6 +73,22 @@ window { background-color: transparent; }
     box-shadow: 0 12px 30px rgba(0, 0, 0, 0.40), 0 1px 4px rgba(0, 0, 0, 0.30);
     padding: 10px;
 }
+/* Scrollbars in every panel: a thin rounded pill that floats over the list, with no track,
+   and none of GTK's glow lines at the ends of a list */
+scrollbar, scrollbar trough { background: none; border: none; box-shadow: none; }
+scrollbar slider {
+    min-width: 4px;
+    min-height: 36px;
+    margin: 3px 2px;
+    border: none;
+    border-radius: 4px;
+    background-color: rgba(255, 255, 255, 0.28);
+    transition: background-color 160ms ease-out, min-width 160ms ease-out;
+}
+scrollbar slider:hover, scrollbar.hovering slider { min-width: 6px; background-color: rgba(255, 255, 255, 0.5); }
+scrollbar slider:active { background-color: rgba(255, 255, 255, 0.7); }
+scrolledwindow undershoot, scrolledwindow overshoot { background: none; border: none; box-shadow: none; }
+
 .tile {
     background-color: rgba(255, 255, 255, 0.07);
     border: 1px solid rgba(255, 255, 255, 0.06);
