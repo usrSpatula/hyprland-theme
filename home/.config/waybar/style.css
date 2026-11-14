@@ -32,10 +32,22 @@ window#waybar {
     border-radius: 5px;
 }
 
+/* The Arch logo at the left end (white, from the system's own logo file). The module keeps
+   its old "apple" name from when this was an Apple logo */
 #custom-apple {
-    font-size: 15px;
-    /* The extra bottom padding lifts the glyph, which sits low in its font */
-    padding: 0 12px 2px 14px;
+    font-size: 1px;
+    min-width: 16px;
+    padding: 0 12px 0 14px;
+    background-image: url("icons/arch.svg");
+    background-repeat: no-repeat;
+    background-position: center;
+    background-size: 16px 16px;
+    transition: background-color 160ms ease-out, background-size 180ms ease-out;
+}
+#custom-apple:hover {
+    background-image: url("icons/arch-big.svg");
+    background-size: 20px 20px;
+    animation: small-hover 420ms ease-out;
 }
 
 /* App name is bold */
@@ -125,11 +137,6 @@ tooltip label {
     color: #ffffff;
 }
 
-/* Icons: Font Awesome solid face (brands face for the Apple and Bluetooth logos) */
-#custom-apple {
-    font-family: "Font Awesome 7 Brands";
-    font-weight: 400;
-}
 
 /* Slide-out volume slider: thin rounded track with a white knob, macOS-style */
 #pulseaudio-slider {
