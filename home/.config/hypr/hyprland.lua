@@ -183,6 +183,9 @@ hl.curve("bouncySlide",    { type = "spring", mass = 1, stiffness = 380, damping
 -- "sway" is loose and unhurried: desktops and windows swing past their place and drift back,
 -- carried by their own weight instead of following a fixed timetable
 hl.curve("sway",           { type = "spring", mass = 1, stiffness = 340, damping = 21 })
+-- "settle" is the same spring with just enough damping that it never goes past its place:
+-- desktops glide in and stop
+hl.curve("settle",         { type = "spring", mass = 1, stiffness = 340, damping = 37 })
 -- The glow turns once around the focused window every 8 seconds, forever
 hl.animation({ leaf = "borderangle",   enabled = true,  speed = 80,   bezier = "linear",       style = "loop" })
 
@@ -210,8 +213,8 @@ hl.animation({ leaf = "zoomFactor",    enabled = true,  speed = 7,    bezier = "
 -- Jumping several desktops at once is one continuous glide: the desktops in between pass at a
 -- steady speed, and the last one slows down from exactly that speed, so nothing stops and restarts.
 -- It all runs inside Hyprland, so there's no script to start between the key press and the motion.
--- The second point sits above 1, so a desktop slides a little past its place and springs back.
-local GLIDE_BOUNCE = 1.16
+-- At 1 a desktop stops exactly in place. Above 1 it would slide past and spring back.
+local GLIDE_BOUNCE = 1
 hl.curve("glide", { type = "bezier", points = { {0.2, 0.9}, {0.3, GLIDE_BOUNCE} } })
 
 local GLIDE_MS        = 480 -- one desktop, and the landing of a longer trip
@@ -220,8 +223,8 @@ local GLIDE_PASSES_MS = 380 -- the most time spent passing desktops, however man
 
 local function glideAnimation(ms, curve)
     if curve == "glide" then
-        -- An ordinary switch to the next desktop rides the loose "sway" spring
-        hl.animation({ leaf = "workspaces", enabled = true, speed = ms / 100, spring = "sway", style = "slide" })
+        -- An ordinary switch to the next desktop rides the "settle" spring: quick, no overshoot
+        hl.animation({ leaf = "workspaces", enabled = true, speed = ms / 100, spring = "settle", style = "slide" })
     else
         hl.animation({ leaf = "workspaces", enabled = true, speed = ms / 100, bezier = curve, style = "slide" })
     end
