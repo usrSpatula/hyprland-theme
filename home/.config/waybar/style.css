@@ -44,24 +44,26 @@ window#waybar {
 }
 
 /* Status icons a touch larger */
-/* Status icons: line icons from the icons folder, all drawn at the same 15px and centred */
+/* Status icons: line icons from the icons folder, all drawn at the same 18px and centred.
+   The sizes are even numbers so each icon lands on whole pixels; an odd size sits half a pixel
+   off in the 24px bar and comes out blurry */
 #bluetooth,
 #pulseaudio,
 #network,
 #custom-search {
     font-size: 1px;
-    min-width: 15px;
+    min-width: 18px;
     padding: 0 8px;
     background-repeat: no-repeat;
     background-position: center;
-    background-size: 15px 15px;
+    background-size: 18px 18px;
 }
 #pulseaudio       { background-image: url("icons/volume.svg"); }
 #pulseaudio.muted { background-image: url("icons/volume-muted.svg"); }
 #bluetooth        { background-image: url("icons/bluetooth.svg"); }
 #network          { background-image: url("icons/wifi.svg"); }
 #network.ethernet { background-image: url("icons/ethernet.svg"); }
-#custom-search    { background-image: url("icons/search.svg"); background-size: 14px 14px; }
+#custom-search    { background-image: url("icons/search.svg"); background-size: 16px 16px; }
 
 #clock {
     padding: 0 12px 0 8px;
