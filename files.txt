@@ -25,5 +25,6 @@
 .config/wofi/style.css
 
 .local/bin/mac-osd
+.local/bin/panel
 .local/bin/spotlight-launcher
 .local/bin/ui-sound

@@ -100,10 +100,10 @@ hl.config({
 
         border_size = 2,
 
-        -- The focused window glows: a gradient in the wallpaper's indigo and lavender that
-        -- turns slowly around the window (see the borderangle animation below)
+        -- The focused window glows: a white-to-black gradient that turns slowly around the
+        -- window (see the borderangle animation below)
         col = {
-            active_border   = { colors = { "rgba(d6d2ffee)", "rgba(6f68f0ee)", "rgba(3e3e82cc)", "rgba(a7a2cfee)", "rgba(6f68f0ee)" }, angle = 45 },
+            active_border   = { colors = { "rgba(ffffffff)", "rgba(000000ff)" }, angle = 45 },
             inactive_border = "rgba(ffffff1a)",
         },
 
@@ -180,12 +180,15 @@ hl.curve("macSlide",       { type = "spring", mass = 1, stiffness = 420, damping
 -- for things that travel a long way
 hl.curve("bouncy",         { type = "spring", mass = 1, stiffness = 260, damping = 15 })
 hl.curve("bouncySlide",    { type = "spring", mass = 1, stiffness = 380, damping = 24 })
+-- "sway" is loose and unhurried: desktops and windows swing past their place and drift back,
+-- carried by their own weight instead of following a fixed timetable
+hl.curve("sway",           { type = "spring", mass = 1, stiffness = 150, damping = 14 })
 -- The glow turns once around the focused window every 8 seconds, forever
 hl.animation({ leaf = "borderangle",   enabled = true,  speed = 80,   bezier = "linear",       style = "loop" })
 
 hl.animation({ leaf = "windows",       enabled = true,  speed = 4.79, spring = "easy" })
 hl.animation({ leaf = "windowsIn",     enabled = true,  speed = 4.1,  spring = "bouncy",       style = "popin 80%" })
-hl.animation({ leaf = "windowsMove",   enabled = true,  speed = 4.79, spring = "bouncySlide" })
+hl.animation({ leaf = "windowsMove",   enabled = true,  speed = 4.79, spring = "sway" })
 hl.animation({ leaf = "windowsOut",    enabled = true,  speed = 2,    bezier = "easeOutQuint", style = "popin 94%" })
 hl.animation({ leaf = "fadeIn",        enabled = true,  speed = 1.73, bezier = "almostLinear" })
 hl.animation({ leaf = "fadeOut",       enabled = true,  speed = 1.46, bezier = "almostLinear" })
@@ -216,7 +219,12 @@ local GLIDE_PASS_MS   = 100 -- each desktop passed on the way
 local GLIDE_PASSES_MS = 380 -- the most time spent passing desktops, however many there are
 
 local function glideAnimation(ms, curve)
-    hl.animation({ leaf = "workspaces", enabled = true, speed = ms / 100, bezier = curve, style = "slide" })
+    if curve == "glide" then
+        -- An ordinary switch to the next desktop rides the loose "sway" spring
+        hl.animation({ leaf = "workspaces", enabled = true, speed = ms / 100, spring = "sway", style = "slide" })
+    else
+        hl.animation({ leaf = "workspaces", enabled = true, speed = ms / 100, bezier = curve, style = "slide" })
+    end
 end
 glideAnimation(GLIDE_MS, "glide")
 
@@ -561,6 +569,8 @@ hl.on("hyprland.start", function()
     hl.exec_cmd("waybar")
     hl.exec_cmd("swaybg -i $HOME/.config/hypr/wallpaper.jpg -m fill")
     hl.exec_cmd("mako")
+    -- Starts the bar's panels hidden, so the first click on one opens it at once
+    hl.exec_cmd("sleep 3; $HOME/.local/bin/panel --warm")
     -- Clip recorder, switched off until you turn it on (see ~/.config/waybar/clips.py)
     hl.exec_cmd("python3 $HOME/.config/waybar/clips.py --daemon")
     -- Clipboard history for the clipboard panel in the gear drawer (see ~/.config/waybar/gear-tools.py)

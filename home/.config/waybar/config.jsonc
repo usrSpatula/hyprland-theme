@@ -107,17 +107,17 @@
     "custom/clipboard": {
         "format": " ",
         "tooltip": false,
-        "on-click": "python3 $HOME/.config/waybar/gear-tools.py --clipboard"
+        "on-click": "$HOME/.local/bin/panel clipboard"
     },
     "custom/screenshots": {
         "format": " ",
         "tooltip": false,
-        "on-click": "python3 $HOME/.config/waybar/gear-tools.py --screenshots"
+        "on-click": "$HOME/.local/bin/panel screenshots"
     },
     "custom/power": {
         "format": " ",
         "tooltip": false,
-        "on-click": "python3 $HOME/.config/waybar/gear-tools.py --power"
+        "on-click": "$HOME/.local/bin/panel power"
     },
 
     // Clips (see clips.py): the film opens the clips panel, with the recording on/off switch
@@ -125,7 +125,7 @@
     "custom/clips": {
         "format": " ",
         "tooltip": false,
-        "on-click": "python3 $HOME/.config/waybar/clips.py --browser"
+        "on-click": "$HOME/.local/bin/panel clips"
     },
     "custom/gear": {
         "format": " ",
@@ -186,7 +186,7 @@
         "format-disconnected": " ",
         "tooltip-format-wifi": "{essid} ({signalStrength}%)",
         "tooltip-format-ethernet": "{ifname}",
-        "on-click": "python3 $HOME/.config/waybar/gear-tools.py --wifi",
+        "on-click": "$HOME/.local/bin/panel wifi",
         "on-click-right": "nm-connection-editor"
     },
 
@@ -200,6 +200,6 @@
     "clock": {
         "format": "{:%a %d %b  %I:%M %p}",
         "tooltip": false,
-        "on-click": "python3 $HOME/.config/waybar/control-center.py"
+        "on-click": "$HOME/.local/bin/panel control-center"
     }
 }

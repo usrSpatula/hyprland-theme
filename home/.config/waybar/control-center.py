@@ -901,7 +901,7 @@ def build_panel(close):
     grid = Gtk.Grid(row_spacing=8, column_spacing=8, row_homogeneous=True, column_homogeneous=True)
     for index, (icon, title, read, write, on_tile_click, font) in enumerate((
             ("wifi", "Wi-Fi", wifi_state, set_wifi,
-             opener("python3", str(Path(__file__).with_name("gear-tools.py")), "--wifi"), ICON_FONT),
+             opener(os.path.expanduser("~/.local/bin/panel"), "wifi"), ICON_FONT),
             ("moon", "Do Not Disturb", dnd_state, set_dnd, None, ICON_FONT),
             ("bluetooth", "Bluetooth", bluetooth_state, set_bluetooth, opener("blueman-manager"), BRAND_FONT),
             ("night", "Night Shift", night_state, set_night, None, ICON_FONT))):
@@ -971,16 +971,24 @@ def build_panel(close):
 
     refresh_toggles()
     tick()
-    GLib.timeout_add_seconds(1, tick)
-    GLib.timeout_add_seconds(REFRESH_SECONDS, refresh_toggles)
+    # Stopped when the panel closes (see open_window)
+    panel.timers = [GLib.timeout_add_seconds(1, tick),
+                    GLib.timeout_add_seconds(REFRESH_SECONDS, refresh_toggles)]
     return panel
 
 
-def open_window(app):
-    provider = Gtk.CssProvider()
-    provider.load_from_data(CSS)
-    Gtk.StyleContext.add_provider_for_screen(
-        Gdk.Screen.get_default(), provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+def load_css(css, loaded=set()):
+    # Once per program: it stays running between openings (see main)
+    if css not in loaded:
+        loaded.add(css)
+        provider = Gtk.CssProvider()
+        provider.load_from_data(css)
+        Gtk.StyleContext.add_provider_for_screen(
+            Gdk.Screen.get_default(), provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+
+
+def open_window(app, on_closed):
+    load_css(CSS)
 
     window = Gtk.ApplicationWindow(application=app)
     window.set_visual(window.get_screen().get_rgba_visual())
@@ -1004,6 +1012,8 @@ def open_window(app):
         if state["closing"]:
             return
         state["closing"] = True
+        for timer in panel.timers:
+            GLib.source_remove(timer)
         sound("close")
         fade_out(revealer)
         revealer.set_transition_duration(CLOSE_DURATION)
@@ -1012,7 +1022,8 @@ def open_window(app):
 
     panel_area = Gtk.EventBox()
     panel_area.set_visible_window(False)
-    panel_area.add(build_panel(close))
+    panel = build_panel(close)
+    panel_area.add(panel)
     panel_area.connect("button-press-event", lambda *_: True)
     panel_area.set_margin_start(SHADOW_ROOM)
     panel_area.set_margin_end(EDGE_GAP)
@@ -1030,6 +1041,7 @@ def open_window(app):
     window.connect("button-press-event", close)
     window.connect("key-press-event", lambda _w, e: e.keyval == Gdk.KEY_Escape and close())
     window.connect("map-event", lambda *_: drop_in(revealer))
+    window.connect("destroy", lambda *_: on_closed())
     window.show_all()
     return close
 
@@ -1095,20 +1107,28 @@ def spring_in(widget, rest):
 
     widget.add_tick_callback(tick)
 
-def main():
-    # One copy at a time: clicking the clock while it's open closes it
-    app = Gtk.Application(application_id="local.waybar.ControlCenter",
-                          flags=Gio.ApplicationFlags.FLAGS_NONE)
-    state = {"close": None}
+def run_resident(app_id, open_panel):
+    """Runs a panel as a program that stays alive between openings, so opening it again is
+    instant: ~/.local/bin/panel just tells it to show itself. Each activation opens the panel,
+    or closes it if it's open. With --standby it starts hidden and waits for the first one."""
+    app = Gtk.Application(application_id=app_id, flags=Gio.ApplicationFlags.FLAGS_NONE)
+    state = {"close": None, "standby": "--standby" in sys.argv}
 
     def activate(application):
-        if state["close"]:
+        if state["standby"]:
+            state["standby"] = False
+        elif state["close"]:
             state["close"]()
         else:
-            state["close"] = open_window(application)
+            state["close"] = open_panel(application, lambda: state.update(close=None))
 
     app.connect("activate", activate)
+    app.hold()
     app.run([sys.argv[0]])
+
+
+def main():
+    run_resident("local.waybar.ControlCenter", open_window)
 
 
 if __name__ == "__main__":

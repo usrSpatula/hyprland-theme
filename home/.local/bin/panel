@@ -1,0 +1,37 @@
+#!/bin/sh
+# Opens one of the bar's panels, or closes it if it's already open.
+#   panel control-center | clips | clipboard | screenshots | wifi | power
+#   panel --warm     starts them all in the background, hidden (Hyprland runs this at login)
+#
+# Each panel is a small program that keeps running once started, so a click only has to
+# tell it to show itself instead of starting Python again. That's what makes them open at once.
+dir="$HOME/.config/waybar"
+
+app() {
+    case "$1" in
+        control-center) id=local.waybar.ControlCenter; set -- "$dir/control-center.py" ;;
+        clips)          id=local.waybar.Clips;         set -- "$dir/clips.py" --browser ;;
+        clipboard)      id=local.waybar.Clipboard;     set -- "$dir/gear-tools.py" --clipboard ;;
+        screenshots)    id=local.waybar.Screenshots;   set -- "$dir/gear-tools.py" --screenshots ;;
+        wifi)           id=local.waybar.Wifi;          set -- "$dir/gear-tools.py" --wifi ;;
+        power)          id=local.waybar.Power;         set -- "$dir/gear-tools.py" --power ;;
+        *) echo "panel: no panel called $1" >&2; exit 1 ;;
+    esac
+    path=/$(echo "$id" | tr . /)
+    if [ -n "$standby" ]; then
+        # Already running? Then there's nothing to warm up
+        busctl --user status "$id" >/dev/null 2>&1 || setsid -f python3 "$@" --standby >/dev/null 2>&1
+    else
+        busctl --user call "$id" "$path" org.freedesktop.Application Activate 'a{sv}' 0 >/dev/null 2>&1 \
+            || setsid -f python3 "$@" >/dev/null 2>&1
+    fi
+}
+
+if [ "$1" = --warm ]; then
+    standby=1
+    for name in control-center clips clipboard screenshots wifi power; do
+        app "$name"
+    done
+else
+    app "$1"
+fi

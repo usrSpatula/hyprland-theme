@@ -920,16 +920,13 @@ def panel_left_edge(width=PANEL_WIDTH):
     return max(12, x - width // 2)
 
 
-def open_panel(app, cc, build, width, extra_css):
+def open_panel(app, cc, build, width, extra_css, on_closed=lambda: None):
     """Opens a glass panel under the click. build(cc, Gtk, GLib, close) returns
     (panel, timers, cleanup). Also used by gear-tools.py."""
     from gi.repository import Gdk, GLib, Gtk, GtkLayerShell
 
     for css in (cc.CSS, extra_css):
-        provider = Gtk.CssProvider()
-        provider.load_from_data(css)
-        Gtk.StyleContext.add_provider_for_screen(
-            Gdk.Screen.get_default(), provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+        cc.load_css(css)
 
     window = Gtk.ApplicationWindow(application=app)
     window.set_visual(window.get_screen().get_rgba_visual())
@@ -988,26 +985,15 @@ def open_panel(app, cc, build, width, extra_css):
     window.connect("key-press-event", lambda _w, e: e.keyval == Gdk.KEY_Escape
                    and not getattr(panel, "cancel_edit", lambda: False)() and close())
     window.connect("map-event", lambda *_: cc.drop_in(revealer))
+    window.connect("destroy", lambda *_: on_closed())
     window.show_all()
     return close
 
 
 def run_panel(app_id, build, width, extra_css):
     cc = load_control_center()
-    from gi.repository import Gio, Gtk
-
-    # One copy at a time: clicking the button while it's open closes it
-    app = Gtk.Application(application_id=app_id, flags=Gio.ApplicationFlags.FLAGS_NONE)
-    state = {"close": None}
-
-    def activate(application):
-        if state["close"]:
-            state["close"]()
-        else:
-            state["close"] = open_panel(application, cc, build, width, extra_css)
-
-    app.connect("activate", activate)
-    app.run([sys.argv[0]])
+    # Stays running between openings (see run_resident in control-center.py)
+    cc.run_resident(app_id, lambda app, on_closed: open_panel(app, cc, build, width, extra_css, on_closed))
 
 
 def browser():
