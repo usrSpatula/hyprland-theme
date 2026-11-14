@@ -934,6 +934,7 @@ def open_panel(app, cc, build, width, extra_css):
 
     state = {"closing": False}
     revealer = Gtk.Revealer()
+    revealer.set_opacity(0)
 
     def close(*_):
         if state["closing"]:
@@ -943,6 +944,7 @@ def open_panel(app, cc, build, width, extra_css):
             GLib.source_remove(timer)
         cleanup()
         cc.sound("close")
+        cc.fade_out(revealer)
         revealer.set_transition_duration(cc.CLOSE_DURATION)
         revealer.set_reveal_child(False)
         GLib.timeout_add(cc.CLOSE_DURATION + 30, window.destroy)

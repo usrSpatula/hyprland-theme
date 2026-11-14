@@ -15,6 +15,7 @@
 # No button on the bar; clips.py borrows its game detection to name clips
 .config/waybar/game-menu.py
 .config/waybar/gear-tools.py
+.config/waybar/icons/
 .config/waybar/sounds/
 
 .config/kitty/kitty.conf

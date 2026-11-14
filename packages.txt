@@ -19,6 +19,7 @@ python-gobject
 python-cairo
 gtk3
 gtk-layer-shell
+librsvg
 dconf
 
 # Fonts and looks

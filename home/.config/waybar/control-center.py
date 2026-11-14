@@ -29,6 +29,7 @@ OPEN_DURATION = 240
 CLOSE_DURATION = 160
 SPRING_DROP = 16      # px a panel starts above its resting place
 SPRING_MS = 520
+FADE_MS = 130        # a panel fades in as it drops, and out as it leaves
 ART_SIZE = 44
 SLIDER_HEIGHT = 22
 SCROLL_STEP = 5
@@ -788,12 +789,14 @@ def open_window(app):
 
     state = {"closing": False}
     revealer = Gtk.Revealer()
+    revealer.set_opacity(0)
 
     def close(*_):
         if state["closing"]:
             return
         state["closing"] = True
         sound("close")
+        fade_out(revealer)
         revealer.set_transition_duration(CLOSE_DURATION)
         revealer.set_reveal_child(False)
         GLib.timeout_add(CLOSE_DURATION + 30, window.destroy)
@@ -825,6 +828,21 @@ def open_window(app):
 
 
 
+def fade_out(widget):
+    """Fades a panel out while its revealer slides it away."""
+    began = [None]
+
+    def tick(widget, clock):
+        now = clock.get_frame_time() / 1000
+        if began[0] is None:
+            began[0] = now
+        t = (now - began[0]) / FADE_MS
+        widget.set_opacity(max(0.0, 1 - t))
+        return t < 1
+
+    widget.add_tick_callback(tick)
+
+
 def spring_in(widget, rest):
     """Drops a panel into place with a small bounce, by moving its top margin.
     It runs alongside the revealer's slide: the panel dips a few px past its place, then settles."""
@@ -835,6 +853,8 @@ def spring_in(widget, rest):
         if began[0] is None:
             began[0] = now
         t = (now - began[0]) / SPRING_MS
+        # Fades in over the first part of the drop, which softens the motion
+        widget.set_opacity(min(1.0, t * SPRING_MS / FADE_MS))
         if t >= 1:
             widget.set_margin_top(rest)
             return False

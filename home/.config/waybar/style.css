@@ -44,13 +44,24 @@ window#waybar {
 }
 
 /* Status icons a touch larger */
+/* Status icons: line icons from the icons folder, all drawn at the same 15px and centred */
 #bluetooth,
 #pulseaudio,
 #network,
 #custom-search {
-    font-size: 13px;
+    font-size: 1px;
+    min-width: 15px;
     padding: 0 8px;
+    background-repeat: no-repeat;
+    background-position: center;
+    background-size: 15px 15px;
 }
+#pulseaudio       { background-image: url("icons/volume.svg"); }
+#pulseaudio.muted { background-image: url("icons/volume-muted.svg"); }
+#bluetooth        { background-image: url("icons/bluetooth.svg"); }
+#network          { background-image: url("icons/wifi.svg"); }
+#network.ethernet { background-image: url("icons/ethernet.svg"); }
+#custom-search    { background-image: url("icons/search.svg"); background-size: 14px 14px; }
 
 #clock {
     padding: 0 12px 0 8px;
@@ -74,7 +85,7 @@ window#waybar {
 #bluetooth.disabled,
 #pulseaudio.muted,
 #network.disconnected {
-    color: rgba(255, 255, 255, 0.5);
+    opacity: 0.5;
 }
 
 /* Gear that opens the scripting progress and Luau course drawer */
@@ -120,19 +131,9 @@ tooltip label {
 }
 
 /* Icons: Font Awesome solid face (brands face for the Apple and Bluetooth logos) */
-#pulseaudio,
-#network,
-#custom-search {
-    font-family: "Font Awesome 7 Free Solid";
-    font-weight: 900;
-}
-#custom-apple,
-#bluetooth {
+#custom-apple {
     font-family: "Font Awesome 7 Brands";
     font-weight: 400;
-}
-#pulseaudio {
-    min-width: 18px;
 }
 
 /* Slide-out volume slider: thin rounded track with a white knob, macOS-style */
