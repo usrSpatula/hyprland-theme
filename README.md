@@ -75,6 +75,12 @@ The theme has soft interface sounds (panels, switches, screenshots, clips, notif
 The **Sounds** switch in the Control Center turns them off. To change a sound, edit
 `~/.config/waybar/sounds/make-sounds.py` and run it.
 
+Everything moves with a bounce: windows pop open, desktops spring into place, panels drop in and
+their rows rise one after another, switches pop, sliders and the volume popup spring to their
+level, bar icons swell under the mouse, and the notch pulses when a song changes or a clip is
+saved. The focused window has a slowly turning glow in the wallpaper's colours; to change them,
+edit `active_border` in `~/.config/hypr/hyprland.lua`.
+
 ## What's in here
 
 | Path | What it is |

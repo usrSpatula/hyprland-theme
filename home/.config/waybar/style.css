@@ -166,3 +166,81 @@ tooltip label {
     border-radius: 2px;
     background-color: #ffffff;
 }
+
+/* ---- Bounce ----
+   Icons swell and settle under the mouse, and jump when what they show changes */
+@keyframes icon-hover {
+    0%   { background-size: 18px 18px; }
+    40%  { background-size: 24px 24px; }
+    70%  { background-size: 19px 19px; }
+    100% { background-size: 22px 22px; }
+}
+@keyframes search-hover {
+    0%   { background-size: 16px 16px; }
+    40%  { background-size: 22px 22px; }
+    70%  { background-size: 17px 17px; }
+    100% { background-size: 20px 20px; }
+}
+#bluetooth, #pulseaudio, #network, #custom-search {
+    transition: background-color 160ms ease-out, background-size 180ms ease-out, opacity 200ms ease-out;
+}
+#bluetooth:hover, #pulseaudio:hover, #network:hover {
+    background-size: 22px 22px;
+    animation: icon-hover 420ms ease-out;
+}
+#custom-search:hover {
+    background-size: 20px 20px;
+    animation: search-hover 420ms ease-out;
+}
+
+/* The gear drawer's icons are letters from an icon font, so those grow by font size.
+   The padding shrinks by the same amount, which keeps their neighbours still */
+@keyframes glyph-hover {
+    0%   { font-size: 12px; padding: 0 8px; }
+    40%  { font-size: 17px; padding: 0 5px; }
+    70%  { font-size: 13px; padding: 0 7px; }
+    100% { font-size: 15px; padding: 0 6px; }
+}
+#custom-gear, #custom-clips, #custom-clipboard, #custom-screenshots, #custom-power {
+    transition: background-color 160ms ease-out, color 160ms ease-out,
+                font-size 180ms ease-out, padding 180ms ease-out;
+}
+#custom-gear:hover, #custom-clips:hover, #custom-clipboard:hover,
+#custom-screenshots:hover, #custom-power:hover {
+    font-size: 15px;
+    padding: 0 6px;
+    animation: glyph-hover 420ms ease-out;
+}
+
+/* A change of state: the icon jumps. Each state has its own copy of the animation,
+   because one only plays again when its name changes */
+@keyframes state-a {
+    0%   { background-size: 18px 18px; }
+    30%  { background-size: 28px 28px; }
+    55%  { background-size: 14px 14px; }
+    80%  { background-size: 20px 20px; }
+    100% { background-size: 18px 18px; }
+}
+@keyframes state-b {
+    0%   { background-size: 18px 18px; }
+    30%  { background-size: 28px 28px; }
+    55%  { background-size: 14px 14px; }
+    80%  { background-size: 20px 20px; }
+    100% { background-size: 18px 18px; }
+}
+@keyframes state-c {
+    0%   { background-size: 18px 18px; }
+    30%  { background-size: 28px 28px; }
+    55%  { background-size: 14px 14px; }
+    80%  { background-size: 20px 20px; }
+    100% { background-size: 18px 18px; }
+}
+#pulseaudio                { animation: state-a 520ms ease-out; }
+#pulseaudio.muted          { animation: state-b 520ms ease-out; }
+#bluetooth                 { animation: state-a 520ms ease-out; }
+#bluetooth.off,
+#bluetooth.disabled        { animation: state-b 520ms ease-out; }
+#bluetooth.connected       { animation: state-c 520ms ease-out; }
+#network                   { animation: state-a 520ms ease-out; }
+#network.disconnected      { animation: state-b 520ms ease-out; }
+#network.ethernet          { animation: state-c 520ms ease-out; }

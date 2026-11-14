@@ -98,11 +98,12 @@ hl.config({
         gaps_in  = 5,
         gaps_out = 20,
 
-        border_size = 1,
+        border_size = 2,
 
-        -- Thin, light "glass edge" borders instead of the neon gradient
+        -- The focused window glows: a gradient in the wallpaper's indigo and lavender that
+        -- turns slowly around the window (see the borderangle animation below)
         col = {
-            active_border   = { colors = { "rgba(ffffffaa)", "rgba(ffffff33)" }, angle = 45 },
+            active_border   = { colors = { "rgba(d6d2ffee)", "rgba(6f68f0ee)", "rgba(3e3e82cc)", "rgba(a7a2cfee)", "rgba(6f68f0ee)" }, angle = 45 },
             inactive_border = "rgba(ffffff1a)",
         },
 
@@ -175,10 +176,16 @@ hl.animation({ leaf = "border",        enabled = true,  speed = 2.5,  bezier = "
 -- macPop has a small overshoot for a soft bounce; macSlide settles with almost none
 hl.curve("macPop",         { type = "spring", mass = 1, stiffness = 300, damping = 26 })
 hl.curve("macSlide",       { type = "spring", mass = 1, stiffness = 420, damping = 40 })
+-- Bouncy springs: "bouncy" clearly overshoots and settles, "bouncySlide" is a firmer version
+-- for things that travel a long way
+hl.curve("bouncy",         { type = "spring", mass = 1, stiffness = 260, damping = 15 })
+hl.curve("bouncySlide",    { type = "spring", mass = 1, stiffness = 380, damping = 24 })
+-- The glow turns once around the focused window every 8 seconds, forever
+hl.animation({ leaf = "borderangle",   enabled = true,  speed = 80,   bezier = "linear",       style = "loop" })
 
 hl.animation({ leaf = "windows",       enabled = true,  speed = 4.79, spring = "easy" })
-hl.animation({ leaf = "windowsIn",     enabled = true,  speed = 4.1,  spring = "macPop",       style = "popin 90%" })
-hl.animation({ leaf = "windowsMove",   enabled = true,  speed = 4.79, spring = "macSlide" })
+hl.animation({ leaf = "windowsIn",     enabled = true,  speed = 4.1,  spring = "bouncy",       style = "popin 80%" })
+hl.animation({ leaf = "windowsMove",   enabled = true,  speed = 4.79, spring = "bouncySlide" })
 hl.animation({ leaf = "windowsOut",    enabled = true,  speed = 2,    bezier = "easeOutQuint", style = "popin 94%" })
 hl.animation({ leaf = "fadeIn",        enabled = true,  speed = 1.73, bezier = "almostLinear" })
 hl.animation({ leaf = "fadeOut",       enabled = true,  speed = 1.46, bezier = "almostLinear" })
@@ -188,11 +195,11 @@ hl.animation({ leaf = "fadeDim",       enabled = true,  speed = 1.5,  bezier = "
 hl.animation({ leaf = "fadeShadow",    enabled = true,  speed = 1.5,  bezier = "easeOutQuint" })
 hl.animation({ leaf = "layers",        enabled = true,  speed = 3.81, bezier = "easeOutQuint" })
 -- Layers (launcher, notifications) arrive with the same soft bounce as windows
-hl.animation({ leaf = "layersIn",      enabled = true,  speed = 4,    spring = "macPop",       style = "fade" })
+hl.animation({ leaf = "layersIn",      enabled = true,  speed = 4,    spring = "bouncy",       style = "fade" })
 hl.animation({ leaf = "layersOut",     enabled = true,  speed = 1.5,  bezier = "linear",       style = "fade" })
 hl.animation({ leaf = "fadeLayersIn",  enabled = true,  speed = 1.79, bezier = "almostLinear" })
 hl.animation({ leaf = "fadeLayersOut", enabled = true,  speed = 1.39, bezier = "almostLinear" })
-hl.animation({ leaf = "specialWorkspace", enabled = true, speed = 5, spring = "macSlide", style = "slidefadevert 20%" })
+hl.animation({ leaf = "specialWorkspace", enabled = true, speed = 5, spring = "bouncySlide", style = "slidefadevert 20%" })
 hl.animation({ leaf = "zoomFactor",    enabled = true,  speed = 7,    bezier = "quick" })
 
 -- WORKSPACE GLIDE
@@ -200,7 +207,9 @@ hl.animation({ leaf = "zoomFactor",    enabled = true,  speed = 7,    bezier = "
 -- Jumping several desktops at once is one continuous glide: the desktops in between pass at a
 -- steady speed, and the last one slows down from exactly that speed, so nothing stops and restarts.
 -- It all runs inside Hyprland, so there's no script to start between the key press and the motion.
-hl.curve("glide", { type = "bezier", points = { {0.2, 0.7}, {0.25, 1} } })
+-- The second point sits above 1, so a desktop slides a little past its place and springs back.
+local GLIDE_BOUNCE = 1.16
+hl.curve("glide", { type = "bezier", points = { {0.2, 0.9}, {0.3, GLIDE_BOUNCE} } })
 
 local GLIDE_MS        = 480 -- one desktop, and the landing of a longer trip
 local GLIDE_PASS_MS   = 100 -- each desktop passed on the way
@@ -277,7 +286,7 @@ function glide_to_workspace(target)
     -- The landing curve sets off at the speed the desktops were passing at
     local slope = GLIDE_MS / pass
     local x = math.min(0.15, 0.95 / slope)
-    hl.curve("glideLanding", { type = "bezier", points = { {x, x * slope}, {0.25, 1} } })
+    hl.curve("glideLanding", { type = "bezier", points = { {x, x * slope}, {0.3, GLIDE_BOUNCE} } })
 
     local function land()
         glideAnimation(GLIDE_MS, "glideLanding")
@@ -597,7 +606,7 @@ pcall(function()
     hl.layer_rule({
         name      = "spotlight-pop",
         match     = { namespace = "^(wofi|spotlight)$" },
-        animation = "popin 92%",
+        animation = "popin 80%",
         dim_around = true,
     })
 end)
@@ -611,6 +620,16 @@ pcall(function()
         blur         = true,
         ignore_alpha = 0.55,
         no_anim      = true,
+    })
+end)
+-- The volume popup (waybar/osd.py) is frosted glass and pops in with a bounce
+pcall(function()
+    hl.layer_rule({
+        name         = "osd-glass",
+        match        = { namespace = "^osd$" },
+        blur         = true,
+        ignore_alpha = 0.3,
+        animation    = "popin 70%",
     })
 end)
 -- The notch animates itself, and Hyprland's layer animation stretches it when it resizes

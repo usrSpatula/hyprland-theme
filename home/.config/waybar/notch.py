@@ -2,7 +2,9 @@
 # The black notch: hover it and it grows into a square menu of audio controls.
 # Waybar starts this once per bar, so extra copies wait on a lock and only one runs.
 import fcntl
+import math
 import os
+import signal
 import subprocess
 import threading
 import urllib.parse
@@ -25,6 +27,8 @@ CLOSE_DELAY_MS = 120
 FRAME_SECONDS = 1 / 60
 MAX_STEP_SECONDS = 1 / 30
 CONTENT_FADE_START = 0.4
+PULSE_GROW = (26, 7)    # px the closed notch swells by when something happens
+PULSE_SECONDS = 0.75
 MAX_ART_BYTES = 5_000_000
 RUNTIME_DIR = Path(os.environ.get("XDG_RUNTIME_DIR", "/tmp"))
 MUSIC_ICON = ""
@@ -191,6 +195,7 @@ class Notch:
         self.tick = None
         self.last_frame = None
         self.close_timer = None
+        self.pulsing = False
 
         self.window = Gtk.Window()
         self.window.set_visual(self.window.get_screen().get_rgba_visual())
@@ -283,6 +288,36 @@ class Notch:
         self.root.set_size_request(width, height)
         self.window.resize(width, height)
 
+    def pulse(self):
+        """Swells the closed notch and lets it settle with a bounce: a new song started,
+        or a clip was saved."""
+        if self.is_open or self.tick is not None or self.pulsing:
+            return
+        self.pulsing = True
+        # The window is only as big as the closed notch, so it needs room to swell into
+        width = IDLE_SIZE[0] + PULSE_GROW[0] + 2 * SHOULDER_WIDTH
+        height = IDLE_SIZE[1] + PULSE_GROW[1]
+        self.root.set_size_request(width, height)
+        self.window.resize(width, height)
+        began = [None]
+
+        def step(_widget, clock):
+            now = clock.get_frame_time() / 1_000_000
+            began[0] = began[0] or now
+            t = now - began[0]
+            if t >= PULSE_SECONDS or self.is_open:
+                self.pulsing = False
+                if not self.is_open:
+                    self.panel.set_size_request(*IDLE_SIZE)
+                    self.set_surface_size(False)
+                return False
+            swell = min(1.0, 1.5 * math.exp(-5 * t) * math.sin(13 * t))
+            self.panel.set_size_request(round(IDLE_SIZE[0] + PULSE_GROW[0] * swell),
+                                        round(IDLE_SIZE[1] + PULSE_GROW[1] * max(swell, 0)))
+            return True
+
+        self.panel.add_tick_callback(step)
+
     def set_open(self, is_open):
         if is_open == self.is_open:
             return
@@ -359,6 +394,22 @@ def apply_css():
     )
 
 
+def pulse_notches(*_):
+    for notch in notches:
+        notch.pulse()
+    return True
+
+
+song = {"title": None}
+
+
+def show_title(title):
+    # The first line is the song that was already playing when this started
+    if song["title"] is not None and title and title != song["title"]:
+        pulse_notches()
+    song["title"] = title
+
+
 def create_notches():
     display = Gdk.Display.get_default()
     for index in range(display.get_n_monitors()):
@@ -368,11 +419,15 @@ def create_notches():
 def main():
     lock = (RUNTIME_DIR / "waybar-notch.lock").open("w")
     fcntl.flock(lock, fcntl.LOCK_EX)
+    # clips.py reads this to make the notch pulse when a clip is saved
+    (RUNTIME_DIR / "waybar-notch.pid").write_text(str(os.getpid()))
+    GLib.unix_signal_add(GLib.PRIORITY_DEFAULT, signal.SIGUSR1, pulse_notches)
 
     apply_css()
     create_notches()
     follow_player(["metadata", "--format", "{{mpris:artUrl}}"], show_art)
     follow_player(["status"], show_status)
+    follow_player(["metadata", "--format", "{{title}}"], show_title)
 
     # Waybar restarts this script, which rebuilds the notches for the new monitors
     display = Gdk.Display.get_default()

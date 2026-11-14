@@ -27,8 +27,11 @@ EDGE_GAP = 8
 SHADOW_ROOM = 34
 OPEN_DURATION = 240
 CLOSE_DURATION = 160
-SPRING_DROP = 16      # px a panel starts above its resting place
-SPRING_MS = 520
+SPRING_DROP = 30      # px a panel starts above its resting place
+SPRING_MS = 620
+CASCADE_STEP_MS = 38  # gap between one row appearing and the next
+CASCADE_ROWS = 14     # rows past this one all arrive together
+CASCADE_CLASSES = ("cascade", "item", "shot", "power-row", "clip-row")
 FADE_MS = 130        # a panel fades in as it drops, and out as it leaves
 ART_SIZE = 44
 SLIDER_HEIGHT = 22
@@ -75,7 +78,45 @@ window { background-color: transparent; }
     padding: 10px;
 }
 /* Tiles lift under the mouse and press in when clicked */
-.toggle { transition: background-color 140ms ease-out, box-shadow 140ms ease-out; }
+.toggle { transition: background-color 220ms ease-out, box-shadow 140ms ease-out; }
+.toggle.on { background-color: rgba(10, 132, 255, 0.16); }
+.toggle.on.hover { background-color: rgba(10, 132, 255, 0.24); }
+
+/* Rows and tiles rise into place one after another when a panel opens (see cascade()).
+   The two margins cancel out, so a row moves without pushing its neighbours around */
+@keyframes rise {
+    0%   { opacity: 0; margin-top: 22px;  margin-bottom: -22px; }
+    55%  { opacity: 1; margin-top: -5px;  margin-bottom: 5px; }
+    78%  { opacity: 1; margin-top: 2px;   margin-bottom: -2px; }
+    100% { opacity: 1; margin-top: 0;     margin-bottom: 0; }
+}
+.rise { animation: rise 520ms ease-out backwards; }
+.rise-1 { animation-delay: 38ms; }
+.rise-2 { animation-delay: 76ms; }
+.rise-3 { animation-delay: 114ms; }
+.rise-4 { animation-delay: 152ms; }
+.rise-5 { animation-delay: 190ms; }
+.rise-6 { animation-delay: 228ms; }
+.rise-7 { animation-delay: 266ms; }
+.rise-8 { animation-delay: 304ms; }
+.rise-9 { animation-delay: 342ms; }
+.rise-10 { animation-delay: 380ms; }
+.rise-11 { animation-delay: 418ms; }
+.rise-12 { animation-delay: 456ms; }
+.rise-13 { animation-delay: 494ms; }
+.rise-14 { animation-delay: 532ms; }
+
+
+/* A switch that turns on swells for a moment and sends out a ring */
+@keyframes pop {
+    0%   { margin: 0;    min-width: 30px; min-height: 30px; border-radius: 15px;
+           box-shadow: 0 0 0 0 rgba(10, 132, 255, 0.75); }
+    35%  { margin: -4px; min-width: 38px; min-height: 38px; border-radius: 19px; }
+    60%  { margin: 1px;  min-width: 28px; min-height: 28px; border-radius: 14px; }
+    100% { margin: 0;    min-width: 30px; min-height: 30px; border-radius: 15px;
+           box-shadow: 0 0 0 14px rgba(10, 132, 255, 0); }
+}
+.circle.popping { animation: pop 460ms ease-out; }
 .toggle.hover { background-color: rgba(255, 255, 255, 0.12); box-shadow: 0 4px 12px rgba(0, 0, 0, 0.28); }
 .toggle.pressed { background-color: rgba(255, 255, 255, 0.04); box-shadow: none; }
 
@@ -176,6 +217,31 @@ def press_feedback(area, target):
     area.connect("leave-notify-event", lambda *_: set_class(target, "pressed", False))
 
 
+def pop(widget):
+    """Plays the "pop" animation on a round button: it swells and sends out a ring."""
+    set_class(widget, "popping", False)
+    set_class(widget, "popping", True)
+    GLib.timeout_add(500, lambda: set_class(widget, "popping", False) and False)
+
+
+def cascade(root):
+    """Makes the rows and tiles inside root rise into place one after another."""
+    found = []
+
+    def walk(widget):
+        context = widget.get_style_context()
+        if any(context.has_class(name) for name in CASCADE_CLASSES):
+            found.append(widget)
+            return
+        if isinstance(widget, Gtk.Container):
+            widget.foreach(walk)
+
+    walk(root)
+    # Rows further down are off the bottom of the panel anyway, and just fade in with it
+    for index, widget in enumerate(found[:CASCADE_ROWS + 1]):
+        css_classes(widget, "rise", *([f"rise-{index}"] if index else []))
+
+
 def icon_label(name, css_class=None, font=ICON_FONT):
     label = Gtk.Label()
     weight = 400 if font == BRAND_FONT else 900
@@ -274,6 +340,7 @@ class Toggle:
     def show(self, on, text):
         self.on = on
         set_class(self.icon_holder, "on", on)
+        set_class(self.button.get_child(), "on", on)
         self.subtitle.set_text(text)
 
     def refresh(self):
@@ -294,6 +361,8 @@ class Toggle:
         else:
             sound("on" if target else "off")
         set_class(self.icon_holder, "on", target)
+        set_class(self.button.get_child(), "on", target)
+        pop(self.icon_holder)
         self.on = target
         self.flipping = True
 
@@ -377,6 +446,9 @@ class Slider(Gtk.DrawingArea):
     def __init__(self, on_change):
         super().__init__()
         self.value = 0
+        self.shown = 0       # where the knob is drawn; it springs after value
+        self.speed = 0
+        self.springing = False
         self.enabled = True
         self.on_change = on_change
         self.set_size_request(-1, SLIDER_HEIGHT)
@@ -390,24 +462,43 @@ class Slider(Gtk.DrawingArea):
         self.connect("motion-notify-event", self.on_drag)
         self.connect("scroll-event", self.on_scroll)
 
-    def set_value(self, value):
+    def set_value(self, value, spring=True):
+        """Moves the slider. The knob glides there with a little bounce, unless it's being
+        dragged, when it has to stay under the mouse."""
         self.value = min(max(value, 0), 100)
+        if not spring:
+            self.shown, self.speed = self.value, 0
+            self.queue_draw()
+        elif not self.springing:
+            self.springing = True
+            self.last = None
+            self.add_tick_callback(self.spring)
+
+    def spring(self, _widget, clock):
+        now = clock.get_frame_time() / 1e6
+        step = min(now - (self.last or now), 0.03)
+        self.last = now
+        self.speed += ((self.value - self.shown) * 380 - self.speed * 24) * step
+        self.shown += self.speed * step
         self.queue_draw()
+        if abs(self.value - self.shown) < 0.1 and abs(self.speed) < 1:
+            self.shown, self.speed, self.springing = self.value, 0, False
+        return self.springing
 
     def set_enabled(self, enabled):
         self.enabled = enabled
         self.queue_draw()
 
-    def change(self, value):
+    def change(self, value, spring=True):
         value = round(min(max(value, 0), 100))
         if value != round(self.value):
-            self.set_value(value)
+            self.set_value(value, spring)
             self.on_change(value)
 
     def on_drag(self, _widget, event):
         if self.enabled:
             travel = self.get_allocated_width() - SLIDER_HEIGHT
-            self.change(100 * (event.x - SLIDER_HEIGHT / 2) / max(travel, 1))
+            self.change(100 * (event.x - SLIDER_HEIGHT / 2) / max(travel, 1), spring=False)
         return True
 
     def on_scroll(self, _widget, event):
@@ -424,7 +515,7 @@ class Slider(Gtk.DrawingArea):
         width = self.get_allocated_width()
         height = SLIDER_HEIGHT
         radius = height / 2
-        knob_x = radius + (width - height) * self.value / 100
+        knob_x = radius + (width - height) * min(max(self.shown, 0), 100) / 100
 
         rounded_rect(cr, 0, 0, width, height, radius)
         cr.set_source_rgba(1, 1, 1, 0.14 if self.enabled else 0.07)
@@ -760,6 +851,9 @@ def build_panel(close):
         update_media()
         return True
 
+    for child in panel.get_children():
+        css_classes(child, "cascade")
+
     refresh_toggles()
     tick()
     GLib.timeout_add_seconds(1, tick)
@@ -843,6 +937,7 @@ def drop_in(revealer):
         revealer.set_transition_duration(OPEN_DURATION)
         revealer.set_reveal_child(True)
         spring_in(revealer, BAR_HEIGHT)
+        cascade(revealer)
         sound("open")
         return False
 
@@ -879,7 +974,7 @@ def spring_in(widget, rest):
         if t >= 1:
             widget.set_margin_top(rest)
             return False
-        offset = -SPRING_DROP * math.exp(-6 * t) * math.cos(11 * t)
+        offset = -SPRING_DROP * math.exp(-5 * t) * math.cos(13 * t)
         widget.set_margin_top(round(rest + offset))
         return True
 

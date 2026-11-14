@@ -32,6 +32,24 @@ else
     fi
 fi
 
+# The popup itself is waybar/osd.py, which stays running between presses: it pops in and
+# springs its bar to the new level. Without it, the plain notification below is used instead.
+runtime=${XDG_RUNTIME_DIR:-/tmp}
+osd="$HOME/.config/waybar/osd.py"
+muted=0
+[[ $status == *MUTED* ]] && muted=1
+echo "$percent $muted" > "$runtime/mac-osd.state"
+
+if [[ -x $osd ]]; then
+    pid=$(cat "$runtime/mac-osd.pid" 2>/dev/null)
+    if [[ -n $pid ]] && grep -qs osd.py "/proc/$pid/cmdline"; then
+        kill -USR1 "$pid"
+    else
+        setsid -f "$osd" >/dev/null 2>&1
+    fi
+    exit 0
+fi
+
 notify-send -a osd -t 1400 -i "$icon" \
     -h "int:value:$value" \
     -h string:x-canonical-private-synchronous:volume \

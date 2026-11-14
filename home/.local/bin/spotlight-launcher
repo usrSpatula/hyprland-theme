@@ -84,6 +84,16 @@ window { background: transparent; }
     background-image: linear-gradient(to bottom, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0.00));
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25);
 }
+/* A result that's new to the list rises into place, one after another. The two margins
+   cancel out, so a row moves without pushing the others around */
+@keyframes rise {
+    0%   { opacity: 0; margin-top: 15px; margin-bottom: -13px; }
+    55%  { opacity: 1; margin-top: -3px; margin-bottom: 5px; }
+    100% { opacity: 1; margin-top: 1px;  margin-bottom: 1px; }
+}
+#results row.rise { animation: rise 380ms ease-out backwards; }
+#results row.rise-1 { animation-delay: 45ms; }
+#results row.rise-2 { animation-delay: 90ms; }
 #results image { margin: 0 10px 0 2px; }
 #results label { color: rgba(255, 255, 255, 0.92); font-size: 15px; }
 #results row:selected label { color: #ffffff; }
@@ -191,8 +201,10 @@ class Launcher(Gtk.Window):
     def fill_results(self, apps):
         for row in self.results.get_children():
             self.results.remove(row)
+        # Only results that weren't in that place already animate, so typing doesn't flicker
+        before = [a.get_id() for a in self.matches] if self.card.get_visible() else []
         self.matches = apps
-        for app in self.matches:
+        for index, app in enumerate(self.matches):
             box = Gtk.Box(spacing=0)
             icon = app.get_icon() or Gio.ThemedIcon.new("application-x-executable")
             img = Gtk.Image.new_from_gicon(icon, Gtk.IconSize.DIALOG)
@@ -200,6 +212,9 @@ class Launcher(Gtk.Window):
             box.pack_start(img, False, False, 0)
             box.pack_start(Gtk.Label(label=app.get_display_name(), xalign=0), True, True, 0)
             row = Gtk.ListBoxRow()
+            if index >= len(before) or before[index] != app.get_id():
+                row.get_style_context().add_class("rise")
+                row.get_style_context().add_class(f"rise-{index}")
             row.add(box)
             self.results.add(row)
 

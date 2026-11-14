@@ -80,7 +80,8 @@ while read -r entry; do
 done < <(list "$repo/files.txt")
 
 chmod +x "$HOME/.local/bin/mac-osd" "$HOME/.local/bin/spotlight-launcher" "$HOME/.local/bin/ui-sound" \
-         "$HOME/.config/hypr/screenshot.sh" "$HOME/.config/hypr/share-picker.sh"
+         "$HOME/.config/hypr/screenshot.sh" "$HOME/.config/hypr/share-picker.sh" \
+         "$HOME/.config/waybar/osd.py"
 
 # The screen-share portal wants the picker's full path, which has your user name in it,
 # so this file is written here instead of copied

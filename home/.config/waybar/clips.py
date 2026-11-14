@@ -164,6 +164,17 @@ def clip_info(path):
 
 # ---- The replay buffers (--daemon) ----
 
+def pulse_notch():
+    """Makes the notch in the bar bounce (notch.py leaves its pid in a file)."""
+    try:
+        runtime = Path(os.environ.get("XDG_RUNTIME_DIR", "/tmp"))
+        pid = int((runtime / "waybar-notch.pid").read_text())
+        if b"notch.py" in Path(f"/proc/{pid}/cmdline").read_bytes():
+            os.kill(pid, signal.SIGUSR1)
+    except (OSError, ValueError):
+        pass
+
+
 class Recorders:
     def __init__(self, enabled=False):
         self.enabled = enabled
@@ -271,6 +282,7 @@ class Recorders:
         notify("Clip saved", f"{label}  ·  last {length_name(seconds)}", thumb)
         subprocess.Popen([str(Path.home() / ".local/bin/ui-sound"), "clip"],
                          stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        pulse_notch()
 
     def write_status(self):
         status = {"installed": bool(shutil.which(RECORDER)),
