@@ -187,7 +187,8 @@ hl.animation({ leaf = "fadeSwitch",    enabled = true,  speed = 1.5,  bezier = "
 hl.animation({ leaf = "fadeDim",       enabled = true,  speed = 1.5,  bezier = "easeOutQuint" })
 hl.animation({ leaf = "fadeShadow",    enabled = true,  speed = 1.5,  bezier = "easeOutQuint" })
 hl.animation({ leaf = "layers",        enabled = true,  speed = 3.81, bezier = "easeOutQuint" })
-hl.animation({ leaf = "layersIn",      enabled = true,  speed = 4,    bezier = "easeOutQuint", style = "fade" })
+-- Layers (launcher, notifications) arrive with the same soft bounce as windows
+hl.animation({ leaf = "layersIn",      enabled = true,  speed = 4,    spring = "macPop",       style = "fade" })
 hl.animation({ leaf = "layersOut",     enabled = true,  speed = 1.5,  bezier = "linear",       style = "fade" })
 hl.animation({ leaf = "fadeLayersIn",  enabled = true,  speed = 1.79, bezier = "almostLinear" })
 hl.animation({ leaf = "fadeLayersOut", enabled = true,  speed = 1.39, bezier = "almostLinear" })

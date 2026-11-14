@@ -968,7 +968,8 @@ def open_panel(app, cc, build, width, extra_css):
     # Esc cancels an edit first (like a rename), then closes the panel
     window.connect("key-press-event", lambda _w, e: e.keyval == Gdk.KEY_Escape
                    and not getattr(panel, "cancel_edit", lambda: False)() and close())
-    window.connect("map-event", lambda *_: revealer.set_reveal_child(True))
+    window.connect("map-event", lambda *_: (revealer.set_reveal_child(True),
+                                            cc.spring_in(revealer, cc.BAR_HEIGHT)))
     window.show_all()
     return close
 

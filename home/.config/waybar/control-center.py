@@ -25,6 +25,8 @@ EDGE_GAP = 8
 SHADOW_ROOM = 34
 OPEN_DURATION = 240
 CLOSE_DURATION = 160
+SPRING_DROP = 16      # px a panel starts above its resting place
+SPRING_MS = 520
 ART_SIZE = 44
 SLIDER_HEIGHT = 22
 SCROLL_STEP = 5
@@ -767,10 +769,30 @@ def open_window(app):
     window.add_events(Gdk.EventMask.BUTTON_PRESS_MASK)
     window.connect("button-press-event", close)
     window.connect("key-press-event", lambda _w, e: e.keyval == Gdk.KEY_Escape and close())
-    window.connect("map-event", lambda *_: revealer.set_reveal_child(True))
+    window.connect("map-event", lambda *_: (revealer.set_reveal_child(True), spring_in(revealer, BAR_HEIGHT)))
     window.show_all()
     return close
 
+
+
+def spring_in(widget, rest):
+    """Drops a panel into place with a small bounce, by moving its top margin.
+    It runs alongside the revealer's slide: the panel dips a few px past its place, then settles."""
+    began = [None]
+
+    def tick(widget, clock):
+        now = clock.get_frame_time() / 1000
+        if began[0] is None:
+            began[0] = now
+        t = (now - began[0]) / SPRING_MS
+        if t >= 1:
+            widget.set_margin_top(rest)
+            return False
+        offset = -SPRING_DROP * math.exp(-6 * t) * math.cos(11 * t)
+        widget.set_margin_top(round(rest + offset))
+        return True
+
+    widget.add_tick_callback(tick)
 
 def main():
     # One copy at a time: clicking the clock while it's open closes it
