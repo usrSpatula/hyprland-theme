@@ -600,13 +600,15 @@ pcall(function()
         dim_around = true,
     })
 end)
--- The Control Center is frosted glass, and slides down by itself (so no layer animation)
+-- The Control Center is frosted glass, and slides down by itself (so no layer animation).
+-- ignore_alpha sits between the panel (0.62) and its drop shadow (under 0.5), so only the panel
+-- is frosted. Any lower and the shadow gets blurred too, which shows as a square behind the panel
 pcall(function()
     hl.layer_rule({
         name         = "control-center-glass",
         match        = { namespace = "^control-center$" },
         blur         = true,
-        ignore_alpha = 0.3,
+        ignore_alpha = 0.55,
         no_anim      = true,
     })
 end)

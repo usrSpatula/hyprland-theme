@@ -58,7 +58,7 @@ window { background-color: transparent; }
     background-color: rgba(30, 30, 34, 0.62);
     border: 1px solid rgba(255, 255, 255, 0.16);
     border-radius: 20px;
-    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.45);
+    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.40), 0 1px 4px rgba(0, 0, 0, 0.30);
     padding: 10px;
 }
 .tile {
