@@ -961,7 +961,6 @@ def open_panel(app, cc, build, width, extra_css):
     panel_area.set_margin_bottom(cc.SHADOW_ROOM + 10)
 
     revealer.set_transition_type(Gtk.RevealerTransitionType.SLIDE_DOWN)
-    revealer.set_transition_duration(cc.OPEN_DURATION)
     revealer.set_halign(Gtk.Align.START)
     revealer.set_valign(Gtk.Align.START)
     revealer.set_margin_start(max(left - cc.SHADOW_ROOM, 0))
@@ -974,8 +973,7 @@ def open_panel(app, cc, build, width, extra_css):
     # Esc cancels an edit first (like a rename), then closes the panel
     window.connect("key-press-event", lambda _w, e: e.keyval == Gdk.KEY_Escape
                    and not getattr(panel, "cancel_edit", lambda: False)() and close())
-    window.connect("map-event", lambda *_: (revealer.set_reveal_child(True),
-                                            cc.spring_in(revealer, cc.BAR_HEIGHT), cc.sound("open")))
+    window.connect("map-event", lambda *_: cc.drop_in(revealer))
     window.show_all()
     return close
 

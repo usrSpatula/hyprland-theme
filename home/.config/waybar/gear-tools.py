@@ -539,7 +539,8 @@ def build_screenshots(cc, Gtk, GLib, close):
         return False
 
     parts.fit_height(scroller, grid, LIST_HEIGHT)
-    threading.Thread(target=load, daemon=True).start()
+    # The pictures load once the panel has finished dropping in, so they don't stutter it
+    GLib.timeout_add(450, lambda: threading.Thread(target=load, daemon=True).start() and False)
     return panel, [], stopped.set
 
 

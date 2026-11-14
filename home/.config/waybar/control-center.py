@@ -811,7 +811,6 @@ def open_window(app):
     panel_area.set_margin_bottom(SHADOW_ROOM + 10)
 
     revealer.set_transition_type(Gtk.RevealerTransitionType.SLIDE_DOWN)
-    revealer.set_transition_duration(OPEN_DURATION)
     revealer.set_halign(Gtk.Align.END)
     revealer.set_valign(Gtk.Align.START)
     revealer.set_margin_top(BAR_HEIGHT)
@@ -821,11 +820,33 @@ def open_window(app):
     window.add_events(Gdk.EventMask.BUTTON_PRESS_MASK)
     window.connect("button-press-event", close)
     window.connect("key-press-event", lambda _w, e: e.keyval == Gdk.KEY_Escape and close())
-    window.connect("map-event", lambda *_: (revealer.set_reveal_child(True), spring_in(revealer, BAR_HEIGHT),
-                                            sound("open")))
+    window.connect("map-event", lambda *_: drop_in(revealer))
     window.show_all()
     return close
 
+
+
+def drop_in(revealer):
+    """Opens a panel. It's first laid out and drawn unseen for a couple of frames, because a big
+    panel (like 100 screenshots) takes long enough to build that it would eat the animation and
+    just snap into place. Then it slides, fades and bounces in."""
+    revealer.set_opacity(0)
+    revealer.set_transition_duration(0)
+    revealer.set_reveal_child(True)
+    frames = [0]
+
+    def tick(_revealer, _clock):
+        frames[0] += 1
+        if frames[0] < 3:
+            return True
+        revealer.set_reveal_child(False)
+        revealer.set_transition_duration(OPEN_DURATION)
+        revealer.set_reveal_child(True)
+        spring_in(revealer, BAR_HEIGHT)
+        sound("open")
+        return False
+
+    revealer.add_tick_callback(tick)
 
 
 def fade_out(widget):
