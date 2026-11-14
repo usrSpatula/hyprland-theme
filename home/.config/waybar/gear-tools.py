@@ -6,11 +6,14 @@
 #   gear-tools.py --screenshots   Your screenshots, newest first. Click to open, copy or trash one,
 #                                 or take a new one.
 #   gear-tools.py --notes         A scratchpad that saves as you type.
+#   gear-tools.py --wifi          Nearby Wi-Fi networks, strongest first. Click one to connect; it
+#                                 asks for the password only if it needs one.
 #   gear-tools.py --power         Lock, sleep, log out, restart and shut down. The last three
 #                                 need a second click.
 import datetime
 import hashlib
 import importlib.util
+import re
 import subprocess
 import sys
 import threading
@@ -39,6 +42,7 @@ ICONS = {
     "lock": "", "moon": "", "logout": "", "restart": "",
     "search": "", "pin": "", "trash": "", "copy": "", "check": "",
     "folder": "", "camera": "", "eraser": "",
+    "wifi": "\uf1eb", "rescan": "\uf021", "eye": "\uf06e", "settings": "\uf013",
 }
 
 TOOLS_CSS = b"""
@@ -47,6 +51,51 @@ TOOLS_CSS = b"""
 .tool-icon.images { background-color: #30d158; }
 .tool-icon.note { background-color: #ffd60a; color: #1c1c1e; }
 .tool-icon.power { background-color: #ff453a; }
+.tool-icon.wifi { background-color: #0a84ff; }
+.wifi-name { font-size: 12px; font-weight: 500; }
+.wifi-name.active { font-weight: 700; }
+.wifi-mark { font-size: 10px; color: rgba(255, 255, 255, 0.55); min-width: 14px; }
+.wifi-mark.active { color: #30d158; }
+.wifi-detail { padding: 0 8px 8px 8px; }
+.wifi-error { font-size: 10px; color: #ff6961; }
+button.pill {
+    background-image: none;
+    background-color: rgba(255, 255, 255, 0.14);
+    border: none;
+    box-shadow: none;
+    text-shadow: none;
+    border-radius: 9px;
+    padding: 4px 12px;
+    min-height: 0;
+    font-size: 11px;
+    font-weight: 600;
+    transition: background-color 140ms ease-out;
+}
+button.pill:hover { background-color: rgba(255, 255, 255, 0.22); }
+button.pill.blue { background-color: #0a84ff; }
+button.pill.blue:hover { background-color: #3a9bff; }
+switch {
+    background-image: none;
+    background-color: rgba(255, 255, 255, 0.2);
+    border: none;
+    box-shadow: none;
+    border-radius: 12px;
+    min-width: 40px;
+    min-height: 22px;
+    transition: background-color 200ms ease-out;
+}
+switch:checked { background-color: #30d158; }
+switch image { color: transparent; }
+switch slider {
+    background-image: none;
+    background-color: #ffffff;
+    border: none;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+    border-radius: 10px;
+    min-width: 18px;
+    min-height: 18px;
+    margin: 2px;
+}
 .tool-title { font-size: 15px; font-weight: 700; }
 entry.search {
     background-color: rgba(255, 255, 255, 0.08);
@@ -621,6 +670,313 @@ POWER_ACTIONS = [
 ]
 
 
+# ---- Wi-Fi ----
+
+def nmcli(*arguments):
+    """Runs nmcli. Returns (worked, what it printed)."""
+    try:
+        result = subprocess.run(["nmcli", *arguments], capture_output=True, text=True, timeout=45)
+    except (OSError, subprocess.TimeoutExpired):
+        return False, ""
+    return result.returncode == 0, (result.stdout + result.stderr).strip()
+
+
+def nmcli_fields(line, count):
+    # nmcli -t separates fields with ":" and puts a backslash before any ":" inside one
+    return [re.sub(r"\\(.)", r"\1", field) for field in re.split(r"(?<!\\):", line, count - 1)]
+
+
+def wifi_networks(rescan):
+    """Nearby networks, the connected one first and then strongest first. A network heard
+    from several access points is listed once."""
+    _, output = nmcli("-t", "-f", "IN-USE,SIGNAL,SECURITY,SSID", "device", "wifi", "list",
+                      "--rescan", "yes" if rescan else "no")
+    best = {}
+    for line in output.splitlines():
+        fields = nmcli_fields(line, 4)
+        if len(fields) < 4 or not fields[3]:
+            continue
+        network = {"name": fields[3], "signal": int(fields[1] or 0),
+                   "secure": fields[2] not in ("", "--"), "active": fields[0] == "*"}
+        old = best.get(network["name"])
+        if not old or network["active"] or (not old["active"] and network["signal"] > old["signal"]):
+            best[network["name"]] = network
+    return sorted(best.values(), key=lambda network: (not network["active"], -network["signal"]))
+
+
+def saved_wifi():
+    """Names of the networks this PC already has the password for."""
+    _, output = nmcli("-t", "-f", "TYPE,NAME", "connection", "show")
+    return {fields[1] for fields in (nmcli_fields(line, 2) for line in output.splitlines())
+            if len(fields) == 2 and fields[0] == "802-11-wireless"}
+
+
+def wifi_error(output):
+    text = output.lower()
+    if "secrets were required" in text or "psk" in text or "password" in text:
+        return "That password didn't work. Try again."
+    if "no network with ssid" in text:
+        return "That network is out of range now."
+    return "Couldn't connect. Try again."
+
+
+def build_wifi(cc, Gtk, GLib, close):
+    parts = Parts(cc, Gtk, GLib)
+    panel = parts.panel(320)
+    state = {"networks": [], "saved": set(), "on": True, "open": None, "busy": None,
+             "error": None, "loading": False, "closed": False}
+
+    header, summary = parts.header("wifi", "Wi-Fi")
+    rescan_button = parts.button("rescan", "Look for networks again", lambda: load(True))
+    header.pack_start(rescan_button, False, False, 0)
+    switch = Gtk.Switch()
+    switch.set_valign(Gtk.Align.CENTER)
+    switch.set_tooltip_text("Turn Wi-Fi on or off")
+    header.pack_start(switch, False, False, 0)
+    panel.pack_start(header, False, False, 0)
+
+    rows = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
+    scroller = parts.scroller(rows, LIST_HEIGHT)
+    panel.pack_start(scroller, False, False, 0)
+
+    def in_background(work, then):
+        def body():
+            result = work()
+            GLib.idle_add(lambda: (None if state["closed"] else then(result)) and False)
+        threading.Thread(target=body, daemon=True).start()
+
+    def draw_signal(area, cr, network):
+        # Four bars, lit up to the signal strength
+        lit = 1 + min(3, network["signal"] // 25)
+        height = area.get_allocated_height()
+        for bar in range(4):
+            tall = 4 + bar * 3
+            cr.rectangle(bar * 5, height - tall - 1, 3, tall)
+            cr.set_source_rgba(1, 1, 1, 0.95 if bar < lit else 0.25)
+            cr.fill()
+
+    def pill(text, on_click, blue=False):
+        button = cc.css_classes(Gtk.Button(label=text), "pill", *(["blue"] if blue else []))
+        button.connect("clicked", lambda *_: on_click())
+        return button
+
+    def connect(network, password=None):
+        name = network["name"]
+        if password is not None and len(password) < 8:
+            state["error"] = "Wi-Fi passwords are at least 8 characters."
+            return show()
+        state["busy"], state["error"] = name, None
+        show()
+
+        def work():
+            if password is None and name in state["saved"]:
+                return nmcli("-w", "25", "connection", "up", "id", name)
+            if name in state["saved"]:
+                # A saved password that stopped working is replaced by the new one
+                nmcli("connection", "delete", "id", name)
+            worked, output = nmcli("-w", "25", "device", "wifi", "connect", name,
+                                   *(["password", password] if password else []))
+            if not worked:
+                # nmcli leaves a half-made entry behind when the password is wrong
+                nmcli("connection", "delete", "id", name)
+            return worked, output
+
+        def done(result):
+            worked, output = result
+            state["busy"] = None
+            if worked:
+                cc.sound("on")
+                state["open"] = None
+            else:
+                state["error"] = wifi_error(output)
+                # Opens the row with the reason. A secured network asks for its password
+                # again there, since a saved one may be what's wrong
+                state["open"] = name
+                state["retry"] = name
+            load(False)
+
+        in_background(work, done)
+
+    def act(network, *command):
+        state["busy"], state["open"] = network["name"], None
+        show()
+
+        def done(_result):
+            state["busy"] = None
+            load(False)
+
+        in_background(lambda: nmcli(*command), done)
+
+    def on_row(network):
+        name = network["name"]
+        if state["busy"]:
+            return
+        state["error"] = None
+        if network["active"] or (network["secure"] and name not in state["saved"]) \
+                or state.get("retry") == name:
+            # Opens the row: Disconnect and Forget, or the password box
+            state["open"] = None if state["open"] == name else name
+            show()
+        else:
+            connect(network)
+
+    def build_row(network):
+        name = network["name"]
+        known = name in state["saved"]
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        line = cc.css_classes(Gtk.Box(spacing=9), "tile", "item")
+        bars = Gtk.DrawingArea()
+        bars.set_size_request(19, 15)
+        bars.set_valign(Gtk.Align.CENTER)
+        bars.connect("draw", draw_signal, network)
+        line.pack_start(bars, False, False, 0)
+        titles = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        titles.set_valign(Gtk.Align.CENTER)
+        title = parts.label(name, "wifi-name")
+        title.set_ellipsize(3)
+        cc.set_class(title, "active", network["active"])
+        titles.pack_start(title, False, False, 0)
+        note = ("Connecting…" if state["busy"] == name else "Connected" if network["active"]
+                else "Saved" if known else "")
+        if note:
+            titles.pack_start(parts.label(note, "item-sub"), False, False, 0)
+        line.pack_start(titles, True, True, 0)
+        if state["busy"] == name:
+            spinner = Gtk.Spinner()
+            spinner.start()
+            line.pack_start(spinner, False, False, 0)
+        elif network["active"]:
+            line.pack_start(cc.css_classes(cc.icon_label("check", "wifi-mark"), "active"), False, False, 0)
+        elif network["secure"]:
+            line.pack_start(cc.icon_label("lock", "wifi-mark"), False, False, 0)
+        box.pack_start(parts.hover_row(line, "item", lambda: on_row(network)), False, False, 0)
+
+        if state["open"] != name or state["busy"]:
+            return box, None
+        detail = cc.css_classes(Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=5), "wifi-detail")
+        detail.set_margin_top(5)
+        focus = None
+        if network["active"]:
+            buttons = Gtk.Box(spacing=6)
+            buttons.pack_start(pill("Disconnect", lambda: act(network, "connection", "down", "id", name)),
+                               False, False, 0)
+            buttons.pack_start(pill("Forget", lambda: act(network, "connection", "delete", "id", name)),
+                               False, False, 0)
+            detail.pack_start(buttons, False, False, 0)
+        elif network["secure"]:
+            entry_row = Gtk.Box(spacing=6)
+            entry = cc.css_classes(Gtk.Entry(), "search")
+            entry.set_visibility(False)
+            entry.set_input_purpose(Gtk.InputPurpose.PASSWORD)
+            entry.set_placeholder_text("Password")
+            entry.connect("activate", lambda *_: connect(network, entry.get_text()))
+            entry_row.pack_start(entry, True, True, 0)
+            entry_row.pack_start(parts.button("eye", "Show the password",
+                                              lambda: entry.set_visibility(not entry.get_visibility())),
+                                 False, False, 0)
+            entry_row.pack_start(pill("Join", lambda: connect(network, entry.get_text()), blue=True),
+                                 False, False, 0)
+            detail.pack_start(entry_row, False, False, 0)
+            focus = entry
+        else:
+            detail.pack_start(pill("Try again", lambda: connect(network), blue=True), False, False, 0)
+        if state["error"]:
+            detail.pack_start(parts.label(state["error"], "wifi-error"), False, False, 0)
+        box.pack_start(detail, False, False, 0)
+        return box, focus
+
+    def show():
+        for child in rows.get_children():
+            child.destroy()
+        active = next((n["name"] for n in state["networks"] if n["active"]), None)
+        summary.set_text("Off" if not state["on"] else f"Connected to {active}" if active
+                         else "Looking for networks…" if state["loading"] and not state["networks"]
+                         else "Not connected")
+        rescan_button.set_sensitive(state["on"] and not state["loading"])
+        focus = None
+        if not state["on"]:
+            rows.pack_start(parts.label("Wi-Fi is off.", "empty", 0.5), False, False, 0)
+        elif not state["networks"] and not state["loading"]:
+            rows.pack_start(parts.label("No networks found.", "empty", 0.5), False, False, 0)
+        for network in state["networks"] if state["on"] else []:
+            row, wants_focus = build_row(network)
+            rows.pack_start(row, False, False, 0)
+            focus = focus or wants_focus
+        settings = cc.css_classes(Gtk.Box(spacing=9), "tile", "item")
+        settings.pack_start(cc.icon_label("settings", "wifi-mark"), False, False, 0)
+        settings.pack_start(parts.label("Network settings…", "wifi-name"), True, True, 0)
+        rows.pack_start(parts.hover_row(settings, "item", lambda: (spawn("nm-connection-editor"), close())),
+                        False, False, 0)
+        rows.show_all()
+        parts.fit_height(scroller, rows, LIST_HEIGHT)
+        if focus:
+            focus.grab_focus()
+
+    def load(rescan):
+        if state["loading"]:
+            return
+        state["loading"] = True
+        show()
+
+        def work():
+            on = nmcli("radio", "wifi")[1] == "enabled"
+            return on, wifi_networks(rescan) if on else [], saved_wifi()
+
+        def done(result):
+            state["on"], state["networks"], state["saved"] = result
+            state["loading"] = False
+            set_switch(state["on"])
+            show()
+
+        in_background(work, done)
+
+    def on_switch(_switch, _value):
+        turn_on = switch.get_active()
+        cc.sound("on" if turn_on else "off")
+        state["on"], state["open"], state["error"] = turn_on, None, None
+        if not turn_on:
+            state["networks"] = []
+        show()
+
+        def work():
+            nmcli("radio", "wifi", "on" if turn_on else "off")
+            if turn_on:
+                # The card needs a moment before it has heard anything
+                threading.Event().wait(2.5)
+
+        in_background(work, lambda _result: load(turn_on))
+
+    switch_handler = switch.connect("notify::active", on_switch)
+
+    def set_switch(on):
+        switch.handler_block(switch_handler)
+        switch.set_active(on)
+        switch.handler_unblock(switch_handler)
+
+    def refresh():
+        # Keeps the list fresh, but never while you're typing a password or connecting
+        if not (state["open"] or state["busy"]):
+            load(True)
+        return True
+
+    def cancel_edit():
+        if state["open"] and not state["busy"]:
+            state["open"], state["error"] = None, None
+            show()
+            return True
+        return False
+
+    panel.cancel_edit = cancel_edit
+    # What the card already knows shows at once; a fresh scan follows
+    state["networks"], state["saved"] = wifi_networks(False), saved_wifi()
+    state["on"] = nmcli("radio", "wifi")[1] == "enabled"
+    set_switch(state["on"])
+    show()
+    timers = [GLib.timeout_add(700, lambda: load(True) and False),
+              GLib.timeout_add_seconds(12, refresh)]
+    return panel, timers, lambda: state.update(closed=True)
+
+
 def build_power(cc, Gtk, GLib, close):
     parts = Parts(cc, Gtk, GLib)
     panel = parts.panel(240)
@@ -667,6 +1023,7 @@ PANELS = {
     "--clipboard": ("local.waybar.Clipboard", build_clipboard, 360),
     "--screenshots": ("local.waybar.Screenshots", build_screenshots, SHOT_COLUMNS * (SHOT_WIDTH + 14) + 30),
     "--notes": ("local.waybar.Notes", build_notes, 360),
+    "--wifi": ("local.waybar.Wifi", build_wifi, 320),
     "--power": ("local.waybar.Power", build_power, 240),
 }
 

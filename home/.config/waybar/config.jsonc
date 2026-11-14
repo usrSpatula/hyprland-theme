@@ -186,7 +186,8 @@
         "format-disconnected": " ",
         "tooltip-format-wifi": "{essid} ({signalStrength}%)",
         "tooltip-format-ethernet": "{ifname}",
-        "on-click": "nm-connection-editor"
+        "on-click": "python3 $HOME/.config/waybar/gear-tools.py --wifi",
+        "on-click-right": "nm-connection-editor"
     },
 
     "custom/search": {

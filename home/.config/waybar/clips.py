@@ -915,6 +915,8 @@ def panel_left_edge(width=PANEL_WIDTH):
         if (monitor["x"] <= x < monitor["x"] + monitor["width"]
                 and monitor["y"] <= y < monitor["y"] + monitor["height"]):
             x -= monitor["x"]
+            # Near the right edge the panel stays on the screen instead of centring on the click
+            x = min(x, monitor["width"] - 44 - width // 2)
     return max(12, x - width // 2)
 
 

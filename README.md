@@ -70,6 +70,9 @@ The clip recorder records the monitor named in `CLIP_MONITOR` at the top of
 
 On the bar: the clock opens the Control Center, and the gear slides out clips, clipboard
 history, screenshots and the power menu.
+The Wi-Fi icon (and the Wi-Fi tile in the Control Center) lists the networks nearby: click one
+to join it, and it asks for a password only when it needs one. Right-click the icon for the
+full network settings.
 
 The theme has soft interface sounds (panels, switches, screenshots, clips, notifications, volume).
 The **Sounds** switch in the Control Center turns them off. To change a sound, edit

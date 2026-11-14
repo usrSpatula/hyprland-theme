@@ -5,12 +5,14 @@
 # Clicking the clock again, clicking anywhere else, or pressing Esc closes it.
 import calendar
 import datetime
+import fcntl
 import math
 import os
 import re
 import subprocess
 import sys
 import threading
+import time
 from pathlib import Path
 from urllib.parse import unquote, urlparse
 
@@ -380,12 +382,19 @@ class Toggle:
 # ---- Brightness and volume ----
 
 class Brightness:
-    """Sets both monitors over DDC/CI. Each ddcutil call takes about 0.3s, so while
-    you drag, a worker applies the newest slider value and skips the ones in between."""
+    """Sets both monitors over DDC/CI, the control channel in the display cable.
+    The slider's value is written straight to each monitor (a few bytes, about 20 times a
+    second), and the monitors are walked to it in small steps, so the picture fades instead of
+    jumping. ddcutil only finds the monitors and reads where they start, and stands in if
+    writing directly isn't allowed."""
+
+    STEP_SECONDS = 0.045   # monitors drop commands that arrive much faster than this
 
     def __init__(self, on_read):
         self.buses = []
         self.target = None
+        self.sent = None
+        self.direct = True
         self.busy = False
         self.lock = threading.Lock()
         threading.Thread(target=self.read, args=(on_read,), daemon=True).start()
@@ -396,6 +405,7 @@ class Brightness:
             return
         parts = run("ddcutil", "--bus", self.buses[0], "getvcp", "10", "--brief").split()
         if len(parts) >= 5 and parts[3].isdigit() and parts[4].isdigit():
+            self.sent = int(parts[3])
             GLib.idle_add(on_read, 100 * int(parts[3]) / max(int(parts[4]), 1))
 
     def set(self, percent):
@@ -407,21 +417,48 @@ class Brightness:
         # Not a daemon thread, so closing the panel mid-drag still applies the last value
         threading.Thread(target=self.apply).start()
 
+    def write(self, value):
+        """Sends one brightness value to every monitor."""
+        if self.direct:
+            # "Set feature 0x10 (brightness)", with the checksum DDC/CI wants on the end
+            message = [0x51, 0x84, 0x03, 0x10, value >> 8, value & 0xFF]
+            check = 0x6E
+            for byte in message:
+                check ^= byte
+            try:
+                for bus in self.buses:
+                    device = os.open(f"/dev/i2c-{bus}", os.O_RDWR)
+                    try:
+                        fcntl.ioctl(device, 0x0703, 0x37)   # I2C_SLAVE: the monitor's address
+                        os.write(device, bytes(message + [check]))
+                    finally:
+                        os.close(device)
+                return
+            except OSError:
+                self.direct = False
+        processes = [
+            subprocess.Popen(["ddcutil", "--bus", bus, "--noverify", "setvcp", "10", str(value)],
+                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            for bus in self.buses
+        ]
+        for process in processes:
+            process.wait()
+
     def apply(self):
         while True:
             with self.lock:
-                value = self.target
-            processes = [
-                subprocess.Popen(["ddcutil", "--bus", bus, "--noverify", "setvcp", "10", str(value)],
-                                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-                for bus in self.buses
-            ]
-            for process in processes:
-                process.wait()
-            with self.lock:
-                if self.target == value:
+                target = self.target
+                if self.sent == target:
                     self.busy = False
                     return
+            if self.sent is None or not self.direct:
+                self.sent = target
+            else:
+                # A quarter of the way there each step, and never less than 1
+                gap = target - self.sent
+                self.sent += max(1, abs(gap) // 4) * (1 if gap > 0 else -1)
+            self.write(self.sent)
+            time.sleep(self.STEP_SECONDS)
 
 
 def read_volume():
@@ -775,18 +812,19 @@ def build_panel(close):
     clock, update_clock = build_clock()
     panel.pack_start(clock, False, False, 0)
 
-    def opener(app):
+    def opener(*command):
         def open_settings():
-            spawn(app)
+            spawn(*command)
             close()
         return open_settings
 
-    # Four equal tiles in a 2x2 grid. Wi-Fi and Bluetooth open their settings when
-    # you click the tile itself; the round icon still flips them.
+    # Four equal tiles in a 2x2 grid. Clicking the Wi-Fi tile opens the list of networks
+    # (gear-tools.py --wifi) and the Bluetooth tile its settings; the round icon still flips them.
     toggles = []
     grid = Gtk.Grid(row_spacing=8, column_spacing=8, row_homogeneous=True, column_homogeneous=True)
     for index, (icon, title, read, write, on_tile_click, font) in enumerate((
-            ("wifi", "Wi-Fi", wifi_state, set_wifi, opener("nm-connection-editor"), ICON_FONT),
+            ("wifi", "Wi-Fi", wifi_state, set_wifi,
+             opener("python3", str(Path(__file__).with_name("gear-tools.py")), "--wifi"), ICON_FONT),
             ("moon", "Do Not Disturb", dnd_state, set_dnd, None, ICON_FONT),
             ("bluetooth", "Bluetooth", bluetooth_state, set_bluetooth, opener("blueman-manager"), BRAND_FONT),
             ("night", "Night Shift", night_state, set_night, None, ICON_FONT))):
