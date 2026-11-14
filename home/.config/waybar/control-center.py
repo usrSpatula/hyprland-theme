@@ -42,6 +42,9 @@ NIGHT_TEMPERATURE = 4500
 REFRESH_SECONDS = 2
 BLUE = "#0a84ff"
 # ui-sound stays quiet while this file exists (the Sounds switch)
+NIGHT_FLAG = Path(os.environ.get("XDG_STATE_HOME") or Path.home() / ".local/state") / "night-shift-on"
+DIM_ZONE = 30    # the bottom 30% of the brightness slider darkens the picture, below the backlight's lowest
+DIM_FLOOR = 10   # % of the picture that's left at the very bottom
 SOUNDS_OFF = Path(os.environ.get("XDG_STATE_HOME") or Path.home() / ".local/state") / "ui-sounds-off"
 
 ICON_FONT = "Font Awesome 7 Free Solid"
@@ -333,16 +336,47 @@ def set_sounds(on):
         SOUNDS_OFF.touch()
 
 
+# hyprsunset does two jobs: Night Shift's warm tint, and the bottom of the brightness slider,
+# which darkens the picture itself (its "gamma"). It only runs while one of them is in use.
+def sunset_running():
+    return bool(run("pgrep", "-x", "hyprsunset").strip())
+
+
+def sunset_gamma():
+    """How bright the picture is, in percent. 100 is untouched."""
+    try:
+        return round(float(run("hyprctl", "hyprsunset", "gamma"))) if sunset_running() else 100
+    except ValueError:
+        return 100
+
+
+def start_sunset(gamma):
+    """(Re)starts hyprsunset for the current Night Shift setting and this gamma,
+    or stops it if neither is needed."""
+    run("pkill", "-x", "hyprsunset")
+    night = NIGHT_FLAG.exists()
+    if not night and gamma >= 100:
+        return
+    for _ in range(20):   # the old one has to let go of the screen first
+        if not sunset_running():
+            break
+        time.sleep(0.02)
+    spawn("hyprsunset", *(["-t", str(NIGHT_TEMPERATURE)] if night else ["-i"]), "-g", str(gamma))
+
+
 def night_state():
-    on = bool(run("pgrep", "-x", "hyprsunset").strip())
+    on = NIGHT_FLAG.exists() and sunset_running()
     return on, "Warm screen" if on else "Off"
 
 
 def set_night(on):
+    gamma = sunset_gamma()
     if on:
-        spawn("hyprsunset", "-t", str(NIGHT_TEMPERATURE))
+        NIGHT_FLAG.parent.mkdir(parents=True, exist_ok=True)
+        NIGHT_FLAG.touch()
     else:
-        run("pkill", "-x", "hyprsunset")
+        NIGHT_FLAG.unlink(missing_ok=True)
+    start_sunset(gamma)
 
 
 class Toggle:
@@ -402,14 +436,19 @@ class Brightness:
     The slider's value is written straight to each monitor (a few bytes, about 20 times a
     second), and the monitors are walked to it in small steps, so the picture fades instead of
     jumping. ddcutil only finds the monitors and reads where they start, and stands in if
-    writing directly isn't allowed."""
+    writing directly isn't allowed.
+
+    A monitor's lowest backlight is still quite bright, so the slider goes further: from
+    DIM_ZONE up it moves the backlight across its whole range, and below that the backlight
+    stays at its lowest while the picture itself is darkened (see start_sunset)."""
 
     STEP_SECONDS = 0.045   # monitors drop commands that arrive much faster than this
 
     def __init__(self, on_read):
         self.buses = []
-        self.target = None
-        self.sent = None
+        self.target = None   # (backlight, gamma) the slider asks for
+        self.sent = None     # the backlight value the monitors have
+        self.gamma = 100
         self.direct = True
         self.busy = False
         self.lock = threading.Lock()
@@ -422,11 +461,19 @@ class Brightness:
         parts = run("ddcutil", "--bus", self.buses[0], "getvcp", "10", "--brief").split()
         if len(parts) >= 5 and parts[3].isdigit() and parts[4].isdigit():
             self.sent = int(parts[3])
-            GLib.idle_add(on_read, 100 * int(parts[3]) / max(int(parts[4]), 1))
+            self.gamma = sunset_gamma()
+            backlight = 100 * int(parts[3]) / max(int(parts[4]), 1)
+            if backlight > 0 or self.gamma >= 100:
+                GLib.idle_add(on_read, DIM_ZONE + backlight * (100 - DIM_ZONE) / 100)
+            else:
+                GLib.idle_add(on_read, DIM_ZONE * (self.gamma - DIM_FLOOR) / (100 - DIM_FLOOR))
 
     def set(self, percent):
         with self.lock:
-            self.target = round(percent)
+            if percent >= DIM_ZONE:
+                self.target = (round(100 * (percent - DIM_ZONE) / (100 - DIM_ZONE)), 100)
+            else:
+                self.target = (0, round(DIM_FLOOR + (100 - DIM_FLOOR) * percent / DIM_ZONE))
             if self.busy:
                 return
             self.busy = True
@@ -460,20 +507,34 @@ class Brightness:
         for process in processes:
             process.wait()
 
+    def write_gamma(self, value):
+        if sunset_running():
+            run("hyprctl", "hyprsunset", "gamma", str(value))
+            if value >= 100 and not NIGHT_FLAG.exists():
+                run("pkill", "-x", "hyprsunset")
+        elif value < 100:
+            start_sunset(value)
+
+    @staticmethod
+    def toward(now, target):
+        # A quarter of the way there each step, and never less than 1
+        gap = target - now
+        return now + max(1, abs(gap) // 4) * (1 if gap > 0 else -1) if gap else now
+
     def apply(self):
         while True:
             with self.lock:
-                target = self.target
-                if self.sent == target:
+                backlight, gamma = self.target
+                if self.sent == backlight and self.gamma == gamma:
                     self.busy = False
                     return
-            if self.sent is None or not self.direct:
-                self.sent = target
-            else:
-                # A quarter of the way there each step, and never less than 1
-                gap = target - self.sent
-                self.sent += max(1, abs(gap) // 4) * (1 if gap > 0 else -1)
-            self.write(self.sent)
+            if self.sent != backlight:
+                smooth = self.sent is not None and self.direct
+                self.sent = self.toward(self.sent, backlight) if smooth else backlight
+                self.write(self.sent)
+            if self.gamma != gamma:
+                self.gamma = self.toward(self.gamma, gamma)
+                self.write_gamma(self.gamma)
             time.sleep(self.STEP_SECONDS)
 
 
