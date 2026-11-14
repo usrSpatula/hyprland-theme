@@ -44,7 +44,8 @@ window#waybar {
 }
 
 /* Status icons a touch larger */
-/* Status icons: line icons from the icons folder, all drawn at the same 18px and centred.
+/* Status icons: line icons from the icons folder, drawn at 16px with 10px between them,
+   the same size and spacing as the app icons in the tray beside them.
    The sizes are even numbers so each icon lands on whole pixels; an odd size sits half a pixel
    off in the 24px bar and comes out blurry */
 #bluetooth,
@@ -52,25 +53,27 @@ window#waybar {
 #network,
 #custom-search {
     font-size: 1px;
-    min-width: 18px;
-    padding: 0 8px;
+    min-width: 16px;
+    padding: 0 5px;
+    margin: 2px 0;
     background-repeat: no-repeat;
     background-position: center;
-    background-size: 18px 18px;
+    background-size: 16px 16px;
 }
 #pulseaudio       { background-image: url("icons/volume.svg"); }
 #pulseaudio.muted { background-image: url("icons/volume-muted.svg"); }
 #bluetooth        { background-image: url("icons/bluetooth.svg"); }
 #network          { background-image: url("icons/wifi.svg"); }
 #network.ethernet { background-image: url("icons/ethernet.svg"); }
-#custom-search    { background-image: url("icons/search.svg"); background-size: 16px 16px; }
+#custom-search    { background-image: url("icons/search.svg"); }
 
 #clock {
     padding: 0 12px 0 8px;
 }
 
 #tray {
-    padding: 0 6px;
+    padding: 0 5px;
+    margin: 2px 0;
 }
 
 /* macOS-style hover highlight */
@@ -179,12 +182,6 @@ tooltip label {
    blurry. So each icon has a second file drawn at the hover size (the "-big" ones), and
    hovering swaps to it: the icon is sharp both at rest and once it has grown. All the sizes
    are even numbers, which keeps them on whole pixels in the bar */
-@keyframes icon-hover {
-    0%   { background-size: 18px 18px; }
-    40%  { background-size: 24px 24px; }
-    70%  { background-size: 21px 21px; }
-    100% { background-size: 22px 22px; }
-}
 @keyframes small-hover {
     0%   { background-size: 16px 16px; }
     40%  { background-size: 22px 22px; }
@@ -195,11 +192,7 @@ tooltip label {
 #custom-gear, #custom-clips, #custom-clipboard, #custom-screenshots, #custom-power {
     transition: background-color 160ms ease-out, background-size 180ms ease-out, opacity 200ms ease-out;
 }
-#bluetooth:hover, #pulseaudio:hover, #network:hover {
-    background-size: 22px 22px;
-    animation: icon-hover 420ms ease-out;
-}
-#custom-search:hover, #custom-gear:hover, #custom-clips:hover, #custom-clipboard:hover,
+#bluetooth:hover, #pulseaudio:hover, #network:hover, #custom-search:hover, #custom-gear:hover, #custom-clips:hover, #custom-clipboard:hover,
 #custom-screenshots:hover, #custom-power:hover {
     background-size: 20px 20px;
     animation: small-hover 420ms ease-out;
@@ -219,25 +212,25 @@ tooltip label {
 /* A change of state: the icon jumps. Each state has its own copy of the animation,
    because one only plays again when its name changes */
 @keyframes state-a {
-    0%   { background-size: 18px 18px; }
-    30%  { background-size: 28px 28px; }
-    55%  { background-size: 14px 14px; }
-    80%  { background-size: 20px 20px; }
-    100% { background-size: 18px 18px; }
+    0%   { background-size: 16px 16px; }
+    30%  { background-size: 24px 24px; }
+    55%  { background-size: 13px 13px; }
+    80%  { background-size: 17px 17px; }
+    100% { background-size: 16px 16px; }
 }
 @keyframes state-b {
-    0%   { background-size: 18px 18px; }
-    30%  { background-size: 28px 28px; }
-    55%  { background-size: 14px 14px; }
-    80%  { background-size: 20px 20px; }
-    100% { background-size: 18px 18px; }
+    0%   { background-size: 16px 16px; }
+    30%  { background-size: 24px 24px; }
+    55%  { background-size: 13px 13px; }
+    80%  { background-size: 17px 17px; }
+    100% { background-size: 16px 16px; }
 }
 @keyframes state-c {
-    0%   { background-size: 18px 18px; }
-    30%  { background-size: 28px 28px; }
-    55%  { background-size: 14px 14px; }
-    80%  { background-size: 20px 20px; }
-    100% { background-size: 18px 18px; }
+    0%   { background-size: 16px 16px; }
+    30%  { background-size: 24px 24px; }
+    55%  { background-size: 13px 13px; }
+    80%  { background-size: 17px 17px; }
+    100% { background-size: 16px 16px; }
 }
 #pulseaudio                { animation: state-a 520ms ease-out; }
 #pulseaudio.muted          { animation: state-b 520ms ease-out; }
