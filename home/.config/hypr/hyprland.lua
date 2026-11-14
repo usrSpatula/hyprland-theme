@@ -100,10 +100,10 @@ hl.config({
 
         border_size = 2,
 
-        -- The focused window glows: a white-to-black gradient that turns slowly around the
+        -- The focused window glows: a white-to-grey gradient that turns slowly around the
         -- window (see the borderangle animation below)
         col = {
-            active_border   = { colors = { "rgba(ffffffff)", "rgba(000000ff)" }, angle = 45 },
+            active_border   = { colors = { "rgba(ffffffff)", "rgba(808080ff)" }, angle = 45 },
             inactive_border = "rgba(ffffff1a)",
         },
 
@@ -182,7 +182,7 @@ hl.curve("bouncy",         { type = "spring", mass = 1, stiffness = 260, damping
 hl.curve("bouncySlide",    { type = "spring", mass = 1, stiffness = 380, damping = 24 })
 -- "sway" is loose and unhurried: desktops and windows swing past their place and drift back,
 -- carried by their own weight instead of following a fixed timetable
-hl.curve("sway",           { type = "spring", mass = 1, stiffness = 150, damping = 14 })
+hl.curve("sway",           { type = "spring", mass = 1, stiffness = 340, damping = 21 })
 -- The glow turns once around the focused window every 8 seconds, forever
 hl.animation({ leaf = "borderangle",   enabled = true,  speed = 80,   bezier = "linear",       style = "loop" })
 
