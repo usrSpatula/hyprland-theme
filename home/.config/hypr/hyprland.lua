@@ -461,6 +461,9 @@ hl.bind(mainMod .. " + S",         hl.dsp.workspace.toggle_special("magic"))
 hl.bind(mainMod .. " + CTRL + S", hl.dsp.window.move({ workspace = "special:magic" }))
 
 -- Scroll through existing workspaces with mainMod + scroll
+-- Hyprland normally ignores a second scroll for 300 ms; with 0 every notch of the wheel counts,
+-- so two quick notches move two desktops straight away
+hl.config({ binds = { scroll_event_delay = 0 } })
 hl.bind(mainMod .. " + mouse_down", hl.dsp.focus({ workspace = "e+1" }))
 hl.bind(mainMod .. " + mouse_up",   hl.dsp.focus({ workspace = "e-1" }))
 
@@ -574,6 +577,8 @@ hl.on("hyprland.start", function()
     hl.exec_cmd("mako")
     -- Starts the bar's panels hidden, so the first click on one opens it at once
     hl.exec_cmd("sleep 3; $HOME/.local/bin/panel --warm")
+    -- Puts back the lighting chosen in RGB Controller (it does nothing until you've used the app)
+    hl.exec_cmd("$HOME/.local/bin/rgb-controller --apply")
     -- Clip recorder, switched off until you turn it on (see ~/.config/waybar/clips.py)
     hl.exec_cmd("python3 $HOME/.config/waybar/clips.py --daemon")
     -- Clipboard history for the clipboard panel in the gear drawer (see ~/.config/waybar/gear-tools.py)

@@ -62,3 +62,6 @@ gst-plugins-good
 gst-plugins-bad
 gst-libav
 gst-plugin-pipewire
+
+# RGB Controller talks to the lights through OpenRGB
+openrgb

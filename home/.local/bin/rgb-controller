@@ -1,0 +1,745 @@
+#!/usr/bin/env python3
+"""RGB Controller: one window for every light in the PC.
+
+It looks everywhere lights can be controlled from and lists what it finds: the motherboard,
+graphics card, memory, fans and strips on the lighting headers, headsets, mice and keyboards.
+Pick a colour, an effect, a brightness and a speed, and every ticked device changes at once.
+Things it can see but not control (and why) are listed underneath.
+
+The hardware side is OpenRGB (the "openrgb" package), which knows how to talk to hundreds of
+devices. This starts it quietly in the background and sends it instructions, so its own
+window never has to be opened.
+
+  rgb-controller            open the window
+  rgb-controller --apply    put back the saved lighting and exit (Hyprland runs this at login)
+  rgb-controller --scan     print what was found and exit
+"""
+import json
+import os
+import re
+import shutil
+import socket
+import struct
+import subprocess
+import sys
+import threading
+import time
+from pathlib import Path
+
+STATE = Path(os.environ.get("XDG_CONFIG_HOME") or Path.home() / ".config") / "rgb-controller" / "state.json"
+HOST, PORT = "127.0.0.1", 6742
+PROTOCOL = 3            # the version of OpenRGB's network protocol this speaks
+DETECT_SECONDS = 45     # OpenRGB takes a while to find everything the first time
+
+# OpenRGB network packets
+CONTROLLER_COUNT, CONTROLLER_DATA, PROTOCOL_VERSION, CLIENT_NAME = 0, 1, 40, 50
+DEVICE_LIST_UPDATED, RESIZE_ZONE, UPDATE_LEDS, UPDATE_MODE, SAVE_MODE = 100, 1000, 1050, 1101, 1102
+
+# What a lighting mode can do
+HAS_SPEED, HAS_BRIGHTNESS, MANUAL_SAVE = 1 << 0, 1 << 4, 1 << 8
+COLORS_PER_LED, COLORS_FOR_MODE = 1, 2
+
+DEVICE_TYPES = ["Motherboard", "Memory", "Graphics card", "Cooler", "Light strip", "Keyboard", "Mouse",
+                "Mouse mat", "Headset", "Headset stand", "Gamepad", "Light", "Speaker", "Virtual",
+                "Storage", "Case", "Microphone", "Accessory", "Keypad"]
+
+EFFECTS = ["Static", "Breathing", "Flashing", "Spectrum Cycle", "Rainbow", "Off"]
+DEFAULTS = {"effect": "Static", "color": [255, 255, 255], "brightness": 100, "speed": 50,
+            "skip": [], "sizes": {}}
+
+# USB makers whose devices often have lights, and notes on ones this can't control
+LIGHT_MAKERS = {"0b05": "ASUS", "046d": "Logitech", "1b1c": "Corsair", "1532": "Razer",
+                "1038": "SteelSeries", "3633": "DeepCool", "0951": "HyperX", "03f0": "HP / HyperX",
+                "2516": "Cooler Master", "1e71": "NZXT", "1462": "MSI", "048d": "ITE (lighting chip)",
+                "0cf2": "Lian Li", "264a": "Thermaltake", "1044": "Gigabyte", "3554": "Compx",
+                "258a": "Sinowealth", "320f": "Evision", "0c45": "Sonix", "04d9": "Holtek"}
+KNOWN = {
+    "0b05:18f3": ("Motherboard", None),   # listed by OpenRGB as the motherboard itself
+    "0b05:1ace": ("Keyboard", "It's connected through its wireless receiver, which lighting software can't "
+                              "reach. Change its lights on the keyboard itself (on ROG keyboards usually "
+                              "Fn + arrow keys), or try it plugged in by cable and press Look again."),
+    "3633:0002": ("Cooler", "Its screen shows the CPU temperature. It has no colour lights to control."),
+    "046d:c099": ("Mouse", "This mouse (G502 X) has no lights."),
+}
+
+
+# ---- Talking to OpenRGB ----
+
+class Reader:
+    def __init__(self, data):
+        self.data, self.at = data, 0
+
+    def take(self, fmt):
+        values = struct.unpack_from("<" + fmt, self.data, self.at)
+        self.at += struct.calcsize("<" + fmt)
+        return values if len(values) > 1 else values[0]
+
+    def text(self):
+        length = self.take("H")
+        value = self.data[self.at:self.at + length]
+        self.at += length
+        return value.rstrip(b"\0").decode("utf-8", "replace")
+
+    def skip(self, count):
+        self.at += count
+
+
+def pack_text(text):
+    raw = text.encode() + b"\0"
+    return struct.pack("<H", len(raw)) + raw
+
+
+def read_mode(reader, version):
+    mode = {"name": reader.text()}
+    mode["value"], mode["flags"], mode["speed_min"], mode["speed_max"] = reader.take("iIII")
+    if version >= 3:
+        mode["brightness_min"], mode["brightness_max"] = reader.take("II")
+    mode["colors_min"], mode["colors_max"], mode["speed"] = reader.take("III")
+    if version >= 3:
+        mode["brightness"] = reader.take("I")
+    mode["direction"], mode["color_mode"] = reader.take("II")
+    mode["colors"] = [reader.take("BBBx")[:3] for _ in range(reader.take("H"))]
+    return mode
+
+
+def pack_mode(mode, version):
+    data = pack_text(mode["name"])
+    data += struct.pack("<iIII", mode["value"], mode["flags"], mode["speed_min"], mode["speed_max"])
+    if version >= 3:
+        data += struct.pack("<II", mode["brightness_min"], mode["brightness_max"])
+    data += struct.pack("<III", mode["colors_min"], mode["colors_max"], mode["speed"])
+    if version >= 3:
+        data += struct.pack("<I", mode["brightness"])
+    data += struct.pack("<IIH", mode["direction"], mode["color_mode"], len(mode["colors"]))
+    for red, green, blue in mode["colors"]:
+        data += struct.pack("<BBBx", red, green, blue)
+    return data
+
+
+def read_device(data, version):
+    reader = Reader(data)
+    reader.take("I")   # the size of everything that follows
+    kind = reader.take("i")
+    device = {"type": DEVICE_TYPES[kind] if 0 <= kind < len(DEVICE_TYPES) else "Device",
+              "name": reader.text()}
+    if version >= 1:
+        device["vendor"] = reader.text()
+    device["description"], device["version"], device["serial"], device["location"] = (
+        reader.text(), reader.text(), reader.text(), reader.text())
+    mode_count, device["active"] = reader.take("Hi")
+    device["modes"] = [read_mode(reader, version) for _ in range(mode_count)]
+    device["zones"] = []
+    for _ in range(reader.take("H")):
+        zone = {"name": reader.text()}
+        zone["type"], zone["min"], zone["max"], zone["count"] = reader.take("iIII")
+        reader.skip(reader.take("H"))   # a keyboard's key layout, which this has no use for
+        device["zones"].append(zone)
+    device["leds"] = 0
+    for _ in range(reader.take("H")):
+        reader.text()
+        reader.take("I")
+        device["leds"] += 1
+    return device
+
+
+class OpenRGB:
+    """A connection to OpenRGB's server (see https://openrgb.org, "SDK")."""
+
+    def __init__(self):
+        self.socket = socket.create_connection((HOST, PORT), timeout=10)
+        self.send(0, PROTOCOL_VERSION, struct.pack("<I", PROTOCOL))
+        self.version = min(PROTOCOL, struct.unpack("<I", self.receive(PROTOCOL_VERSION))[0])
+        self.send(0, CLIENT_NAME, b"RGB Controller\0")
+
+    def send(self, device, packet, data=b""):
+        self.socket.sendall(struct.pack("<4sIII", b"ORGB", device, packet, len(data)) + data)
+
+    def read(self, count):
+        data = b""
+        while len(data) < count:
+            chunk = self.socket.recv(count - len(data))
+            if not chunk:
+                raise ConnectionError("OpenRGB closed the connection")
+            data += chunk
+        return data
+
+    def receive(self, wanted):
+        while True:
+            _magic, _device, packet, size = struct.unpack("<4sIII", self.read(16))
+            data = self.read(size)
+            if packet == wanted:   # anything else is OpenRGB saying its device list changed
+                return data
+
+    def count(self):
+        self.send(0, CONTROLLER_COUNT)
+        return struct.unpack("<I", self.receive(CONTROLLER_COUNT))[0]
+
+    def devices(self):
+        found = []
+        for index in range(self.count()):
+            self.send(index, CONTROLLER_DATA, struct.pack("<I", self.version))
+            device = read_device(self.receive(CONTROLLER_DATA), self.version)
+            device["index"] = index
+            found.append(device)
+        return found
+
+    def set_mode(self, device, number, mode, save=False):
+        body = struct.pack("<i", number) + pack_mode(mode, self.version)
+        self.send(device, UPDATE_MODE, struct.pack("<I", len(body) + 4) + body)
+        if save:
+            self.send(device, SAVE_MODE, struct.pack("<I", len(body) + 4) + body)
+
+    def set_leds(self, device, colors):
+        body = struct.pack("<H", len(colors)) + b"".join(struct.pack("<BBBx", *color) for color in colors)
+        self.send(device, UPDATE_LEDS, struct.pack("<I", len(body) + 4) + body)
+
+    def resize_zone(self, device, zone, size):
+        self.send(device, RESIZE_ZONE, struct.pack("<ii", zone, size))
+
+    def close(self):
+        self.socket.close()
+
+
+def server_running():
+    try:
+        socket.create_connection((HOST, PORT), timeout=0.5).close()
+        return True
+    except OSError:
+        return False
+
+
+def start_server():
+    """Starts OpenRGB in the background, if it isn't already. Returns the process it started."""
+    if server_running():
+        return None
+    return subprocess.Popen(["openrgb", "--server", "--noautoconnect"], start_new_session=True,
+                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+
+def connect():
+    """Waits for OpenRGB to finish looking for devices, then returns a connection to it."""
+    deadline = time.monotonic() + DETECT_SECONDS
+    while not server_running():
+        if time.monotonic() > deadline:
+            raise ConnectionError("OpenRGB didn't start")
+        time.sleep(0.3)
+    link = OpenRGB()
+    # The list fills in as devices are found: it's ready once it has stopped growing
+    last, since = -1, time.monotonic()
+    while time.monotonic() < deadline:
+        count = link.count()
+        if count != last:
+            last, since = count, time.monotonic()
+        elif count and time.monotonic() - since > 1.5:
+            break
+        elif not count and time.monotonic() - since > 12:
+            break
+        time.sleep(0.3)
+    return link
+
+
+# ---- Lighting ----
+
+def find_mode(device, effect):
+    for number, mode in enumerate(device["modes"]):
+        if mode["name"].lower() == effect.lower():
+            return number, mode
+    return None, None
+
+
+def apply_to(link, device, state, save=False):
+    """Sets one device to the chosen colour, effect, brightness and speed.
+    Returns False if the device has no such effect."""
+    effect = state["effect"]
+    color = tuple(state["color"])
+    level = state["brightness"] / 100
+    number, mode = find_mode(device, effect)
+    if mode is None and effect == "Off":
+        # No "off" of its own: a steady black does the same
+        number, mode = find_mode(device, "Static")
+        color = (0, 0, 0)
+    if mode is None and effect == "Static":
+        number, mode = find_mode(device, "Direct")
+    if mode is None:
+        return False
+
+    mode = dict(mode)
+    if mode["flags"] & HAS_BRIGHTNESS and "brightness" in mode:
+        low, high = mode["brightness_min"], mode["brightness_max"]
+        mode["brightness"] = round(low + (high - low) * level)
+    else:
+        # The device has no brightness setting, so the colour itself is made darker
+        color = tuple(round(part * level) for part in color)
+    if mode["flags"] & HAS_SPEED:
+        low, high = mode["speed_min"], mode["speed_max"]
+        mode["speed"] = round(low + (high - low) * state["speed"] / 100)
+    if mode["color_mode"] == COLORS_FOR_MODE:
+        mode["colors"] = [color] * max(mode["colors_min"], 1)
+    link.set_mode(device["index"], number, mode, save and bool(mode["flags"] & MANUAL_SAVE))
+    if mode["color_mode"] == COLORS_PER_LED and device["leds"]:
+        link.set_leds(device["index"], [color] * device["leds"])
+    return True
+
+
+def apply_all(link, devices, state, save=False):
+    missing = []
+    for device in devices:
+        if device["name"] not in state["skip"] and not apply_to(link, device, state, save):
+            missing.append(device["name"])
+    return missing
+
+
+def apply_sizes(link, devices, state):
+    """Tells the lighting headers how many lights are plugged into them."""
+    changed = False
+    for device in devices:
+        for number, zone in enumerate(device["zones"]):
+            size = state["sizes"].get(f"{device['name']}/{zone['name']}")
+            if size is not None and zone["min"] != zone["max"] and size != zone["count"]:
+                link.resize_zone(device["index"], number, min(max(size, zone["min"]), zone["max"]))
+                changed = True
+    return changed
+
+
+def load_state():
+    try:
+        return {**DEFAULTS, **json.loads(STATE.read_text())}
+    except (OSError, ValueError):
+        return dict(DEFAULTS)
+
+
+def save_state(state):
+    STATE.parent.mkdir(parents=True, exist_ok=True)
+    STATE.write_text(json.dumps(state, indent=2))
+
+
+# ---- Everything else that might have lights ----
+
+def other_finds(devices):
+    """Things with lights (or that look like they should have them) that OpenRGB didn't list:
+    (name, note) pairs."""
+    finds = []
+    types = {device["type"] for device in devices}
+    names = " ".join(device["name"] for device in devices).lower()
+    try:
+        usb = subprocess.run(["lsusb"], capture_output=True, text=True).stdout
+    except OSError:
+        usb = ""
+    for line in usb.splitlines():
+        match = re.search(r"ID (\w{4}):(\w{4}) (.*)", line)
+        if not match or match.group(1) not in LIGHT_MAKERS:
+            continue
+        key, name = f"{match.group(1)}:{match.group(2)}", match.group(3).strip()
+        kind, note = KNOWN.get(key, (None, "Seen on USB, but nothing here knows how to control its lights."))
+        # Skip what OpenRGB already controls: a matching kind of device, or a shared model name
+        words = [word.lower() for word in re.findall(r"[A-Za-z]*\d[\w-]*", name)]
+        if (kind in types and key != "0b05:1ace") or any(word in names for word in words):
+            continue
+        if note:
+            finds.append((name, note))
+
+    # Lights the Linux kernel drives directly (laptop keyboard backlights, some gaming keyboards)
+    for led in sorted(Path("/sys/class/leds").glob("*")):
+        if (led / "multi_intensity").exists() or re.search(r"kbd_backlight|rgb", led.name):
+            finds.append((led.name, "A light the system controls by itself. Its brightness is in "
+                                    f"{led}/brightness."))
+    return finds
+
+
+# ---- Command line ----
+
+def with_server(work):
+    server = start_server()
+    try:
+        link = connect()
+        try:
+            return work(link)
+        finally:
+            link.close()
+    finally:
+        if server:
+            server.terminate()
+
+
+def apply_saved():
+    if not STATE.exists():
+        return
+    state = load_state()
+
+    def work(link):
+        devices = link.devices()
+        if apply_sizes(link, devices, state):
+            time.sleep(0.5)
+            devices = link.devices()
+        apply_all(link, devices, state)
+        time.sleep(0.5)   # lets the last instruction reach the hardware before OpenRGB stops
+
+    with_server(work)
+
+
+def print_scan():
+    def work(link):
+        devices = link.devices()
+        for device in devices:
+            modes = ", ".join(mode["name"] for mode in device["modes"])
+            print(f"{device['name']}  ({device['type']}, {device['leds']} lights)\n    effects: {modes}")
+            for zone in device["zones"]:
+                room = f", room for {zone['max']}" if zone["min"] != zone["max"] else ""
+                print(f"    {zone['name']}: {zone['count']} lights{room}")
+        for name, note in other_finds(devices):
+            print(f"{name}\n    not controllable: {note}")
+
+    with_server(work)
+
+
+# ---- The window ----
+
+CSS = b"""
+* { font-family: "Inter", "Noto Sans", sans-serif; }
+window { background-color: #1c1c20; color: #ffffff; }
+.title { font-size: 20px; font-weight: 700; }
+.sub { font-size: 12px; color: rgba(255, 255, 255, 0.6); }
+.section { font-size: 11px; font-weight: 700; color: rgba(255, 255, 255, 0.5); }
+.card {
+    background-color: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    border-radius: 14px;
+    padding: 12px 14px;
+}
+.name { font-size: 13px; font-weight: 600; }
+.note { font-size: 11px; color: rgba(255, 255, 255, 0.6); }
+.swatch { min-width: 30px; min-height: 30px; border-radius: 15px; border: 2px solid transparent;
+          padding: 0; background-image: none; box-shadow: none; }
+.swatch.chosen { border-color: #ffffff; }
+button.pill {
+    background-image: none; background-color: rgba(255, 255, 255, 0.12); border: none;
+    box-shadow: none; text-shadow: none; border-radius: 10px; padding: 6px 14px;
+    font-size: 12px; font-weight: 600; color: #ffffff;
+}
+button.pill:hover { background-color: rgba(255, 255, 255, 0.2); }
+button.pill.chosen { background-color: #0a84ff; }
+label { color: #ffffff; }
+"""
+
+SWATCHES = ["#ffffff", "#ff3b30", "#ff9500", "#ffd60a", "#30d158", "#40c8e0", "#0a84ff", "#5e5ce6",
+            "#bf5af2", "#ff375f"]
+
+
+def run_window():
+    import gi
+    gi.require_version("Gtk", "3.0")
+    gi.require_version("Gdk", "3.0")
+    from gi.repository import Gdk, GLib, Gtk
+
+    provider = Gtk.CssProvider()
+    provider.load_from_data(CSS)
+    Gtk.StyleContext.add_provider_for_screen(Gdk.Screen.get_default(), provider,
+                                             Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+    state = load_state()
+    session = {"link": None, "server": None, "devices": [], "timer": 0, "lock": threading.Lock()}
+
+    def styled(widget, *names):
+        for name in names:
+            widget.get_style_context().add_class(name)
+        return widget
+
+    def label(text, css_class, wrap=False):
+        widget = styled(Gtk.Label(label=text, xalign=0), css_class)
+        if wrap:
+            widget.set_line_wrap(True)
+            widget.set_max_width_chars(60)
+        return widget
+
+    window = Gtk.Window(title="RGB Controller")
+    window.set_default_size(560, 720)
+    window.set_wmclass("rgb-controller", "RGB Controller")
+    page = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
+    page.set_border_width(18)
+    scroller = Gtk.ScrolledWindow()
+    scroller.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+    scroller.add(page)
+    window.add(scroller)
+
+    top = Gtk.Box(spacing=10)
+    titles = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
+    titles.pack_start(label("RGB Controller", "title"), False, False, 0)
+    status = label("Looking for lights…", "sub")
+    titles.pack_start(status, False, False, 0)
+    top.pack_start(titles, True, True, 0)
+    rescan = styled(Gtk.Button(label="Look again"), "pill")
+    rescan.set_valign(Gtk.Align.CENTER)
+    top.pack_start(rescan, False, False, 0)
+    page.pack_start(top, False, False, 0)
+
+    # Colour
+    controls = styled(Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10), "card")
+    page.pack_start(controls, False, False, 0)
+    controls.pack_start(label("COLOUR", "section"), False, False, 0)
+    swatch_row = Gtk.Box(spacing=8)
+    swatches = []
+
+    def show_color():
+        current = "#%02x%02x%02x" % tuple(state["color"])
+        for button, value in swatches:
+            (button.get_style_context().add_class if value == current
+             else button.get_style_context().remove_class)("chosen")
+
+    def pick(color):
+        state["color"] = list(color)
+        show_color()
+        changed()
+
+    for value in SWATCHES:
+        button = styled(Gtk.Button(), "swatch")
+        rgb = tuple(int(value[i:i + 2], 16) for i in (1, 3, 5))
+        button.override_background_color(Gtk.StateFlags.NORMAL, Gdk.RGBA(*(part / 255 for part in rgb), 1))
+        button.connect("clicked", lambda _b, c=rgb: pick(c))
+        swatches.append((button, value))
+        swatch_row.pack_start(button, False, False, 0)
+    custom = Gtk.ColorButton()
+    custom.set_title("Pick any colour")
+    custom.set_rgba(Gdk.RGBA(*(part / 255 for part in state["color"]), 1))
+    custom.connect("color-set", lambda b: pick(tuple(round(part * 255) for part in
+                                                      (b.get_rgba().red, b.get_rgba().green, b.get_rgba().blue))))
+    swatch_row.pack_end(custom, False, False, 0)
+    controls.pack_start(swatch_row, False, False, 0)
+
+    # Effect
+    controls.pack_start(label("EFFECT", "section"), False, False, 0)
+    effect_row = Gtk.FlowBox()
+    effect_row.set_selection_mode(Gtk.SelectionMode.NONE)
+    effect_row.set_max_children_per_line(6)
+    effect_row.set_column_spacing(6)
+    effect_row.set_row_spacing(6)
+    effect_buttons = {}
+
+    def show_effect():
+        for name, button in effect_buttons.items():
+            (button.get_style_context().add_class if name == state["effect"]
+             else button.get_style_context().remove_class)("chosen")
+
+    def pick_effect(name):
+        state["effect"] = name
+        show_effect()
+        changed()
+
+    for name in EFFECTS:
+        button = styled(Gtk.Button(label=name), "pill")
+        button.connect("clicked", lambda _b, n=name: pick_effect(n))
+        effect_buttons[name] = button
+        effect_row.add(button)
+    controls.pack_start(effect_row, False, False, 0)
+
+    def slider(title, key):
+        row = Gtk.Box(spacing=10)
+        name = label(title, "name")
+        name.set_size_request(86, -1)
+        row.pack_start(name, False, False, 0)
+        scale = Gtk.Scale.new_with_range(Gtk.Orientation.HORIZONTAL, 0, 100, 1)
+        scale.set_value(state[key])
+        scale.set_draw_value(False)
+        scale.set_hexpand(True)
+
+        def moved(_scale):
+            state[key] = round(scale.get_value())
+            changed()
+
+        scale.connect("value-changed", moved)
+        row.pack_start(scale, True, True, 0)
+        controls.pack_start(row, False, False, 0)
+
+    slider("Brightness", "brightness")
+    slider("Speed", "speed")
+
+    bottom = Gtk.Box(spacing=8)
+    hint = label("Changes show straight away, and come back at every login.", "note", wrap=True)
+    bottom.pack_start(hint, True, True, 0)
+    store = styled(Gtk.Button(label="Save into devices"), "pill")
+    store.set_tooltip_text("Also writes the lighting into the devices' own memory, where they have one, "
+                           "so it shows before you log in and on other systems")
+    store.set_valign(Gtk.Align.CENTER)
+    bottom.pack_start(store, False, False, 0)
+    controls.pack_start(bottom, False, False, 0)
+
+    devices_title = label("LIGHTS FOUND", "section")
+    page.pack_start(devices_title, False, False, 0)
+    device_list = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+    page.pack_start(device_list, False, False, 0)
+    others_title = label("FOUND, BUT NOT CONTROLLABLE", "section")
+    page.pack_start(others_title, False, False, 0)
+    other_list = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+    page.pack_start(other_list, False, False, 0)
+
+    def in_background(work, then=None):
+        def body():
+            with session["lock"]:
+                try:
+                    result = work()
+                except (OSError, struct.error, ConnectionError) as error:
+                    result = error
+            if then:
+                GLib.idle_add(lambda: then(result) and False)
+        threading.Thread(target=body, daemon=True).start()
+
+    def send(save=False):
+        session["timer"] = 0
+        save_state(state)
+        link, devices = session["link"], session["devices"]
+        if not link:
+            return False
+
+        def done(result):
+            if isinstance(result, Exception):
+                status.set_text("Lost touch with OpenRGB. Press Look again.")
+            elif result:
+                status.set_text(f"{state['effect']} isn't something {', '.join(result)} can do; "
+                                "the rest changed.")
+            else:
+                status.set_text("Saved into the devices." if save else summary())
+
+        in_background(lambda: apply_all(link, devices, dict(state), save), done)
+        return False
+
+    def changed():
+        # Waits a moment, so dragging a slider doesn't flood the devices
+        if session["timer"]:
+            GLib.source_remove(session["timer"])
+        session["timer"] = GLib.timeout_add(120, send)
+
+    store.connect("clicked", lambda *_: send(save=True))
+
+    def summary():
+        lights = sum(device["leds"] for device in session["devices"])
+        count = len(session["devices"])
+        return f"{count} device{'s' * (count != 1)}, {lights} lights" if count else "No controllable lights found"
+
+    def show_devices(others):
+        for box in (device_list, other_list):
+            for child in box.get_children():
+                child.destroy()
+        for device in session["devices"]:
+            card = styled(Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6), "card")
+            row = Gtk.Box(spacing=10)
+            texts = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
+            texts.pack_start(label(device["name"], "name"), False, False, 0)
+            texts.pack_start(label(f"{device['type']}  ·  {device['leds']} lights", "note"), False, False, 0)
+            row.pack_start(texts, True, True, 0)
+            switch = Gtk.Switch()
+            switch.set_active(device["name"] not in state["skip"])
+            switch.set_valign(Gtk.Align.CENTER)
+            switch.set_tooltip_text("Whether this device follows the settings above")
+
+            def toggled(switch, _value, name=device["name"]):
+                state["skip"] = [n for n in state["skip"] if n != name] + ([] if switch.get_active() else [name])
+                changed()
+
+            switch.connect("notify::active", toggled)
+            row.pack_start(switch, False, False, 0)
+            card.pack_start(row, False, False, 0)
+            # Lighting headers don't know what's plugged into them, so you have to say
+            for number, zone in enumerate(device["zones"]):
+                if zone["min"] == zone["max"]:
+                    continue
+                line = Gtk.Box(spacing=8)
+                line.pack_start(label(f"Lights plugged into {zone['name']}", "note"), True, True, 0)
+                spin = Gtk.SpinButton.new_with_range(zone["min"], zone["max"], 1)
+                spin.set_value(zone["count"])
+
+                def resized(spin, device=device, zone=zone):
+                    state["sizes"][f"{device['name']}/{zone['name']}"] = spin.get_value_as_int()
+                    save_state(state)
+                    link = session["link"]
+
+                    def work():
+                        apply_sizes(link, session["devices"], state)
+                        time.sleep(0.5)
+                        fresh = link.devices()
+                        apply_all(link, fresh, dict(state))
+                        return fresh
+
+                    def done(result):
+                        if not isinstance(result, Exception):
+                            session["devices"] = result
+                            status.set_text(summary())
+
+                    in_background(work, done)
+
+                spin.connect("value-changed", resized)
+                line.pack_start(spin, False, False, 0)
+                card.pack_start(line, False, False, 0)
+            device_list.pack_start(card, False, False, 0)
+        if not session["devices"]:
+            device_list.pack_start(label("Nothing that can be controlled was found.", "note"), False, False, 0)
+        for name, note in others:
+            card = styled(Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=3), "card")
+            card.pack_start(label(name, "name"), False, False, 0)
+            card.pack_start(label(note, "note", wrap=True), False, False, 0)
+            other_list.pack_start(card, False, False, 0)
+        others_title.set_visible(bool(others))
+        device_list.show_all()
+        other_list.show_all()
+
+    def scan(*_):
+        rescan.set_sensitive(False)
+        status.set_text("Looking for lights… (this takes about ten seconds)")
+        if not shutil.which("openrgb"):
+            status.set_text("OpenRGB isn't installed. Run: sudo pacman -S openrgb")
+            show_devices(other_finds([]))
+            rescan.set_sensitive(True)
+            return
+
+        def work():
+            if session["link"]:
+                session["link"].close()
+                session["link"] = None
+            if session["server"]:
+                # A fresh start makes OpenRGB look for hardware again
+                session["server"].terminate()
+                session["server"].wait()
+            session["server"] = start_server()
+            link = connect()
+            devices = link.devices()
+            if apply_sizes(link, devices, state):
+                time.sleep(0.5)
+                devices = link.devices()
+            session["link"], session["devices"] = link, devices
+            return other_finds(devices)
+
+        def done(result):
+            rescan.set_sensitive(True)
+            if isinstance(result, Exception):
+                status.set_text("Couldn't reach OpenRGB. Press Look again.")
+                return
+            status.set_text(summary())
+            show_devices(result)
+
+        in_background(work, done)
+
+    rescan.connect("clicked", scan)
+
+    def closed(*_):
+        if session["timer"]:
+            GLib.source_remove(session["timer"])
+            send()
+        # Gives the last instruction time to reach the hardware, then stops OpenRGB if this started it
+        time.sleep(0.4)
+        if session["server"]:
+            session["server"].terminate()
+        Gtk.main_quit()
+
+    window.connect("destroy", closed)
+    show_color()
+    show_effect()
+    window.show_all()
+    others_title.hide()
+    scan()
+    Gtk.main()
+
+
+if __name__ == "__main__":
+    if "--apply" in sys.argv:
+        apply_saved()
+    elif "--scan" in sys.argv:
+        print_scan()
+    else:
+        run_window()

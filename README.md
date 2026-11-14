@@ -74,6 +74,11 @@ The Wi-Fi icon (and the Wi-Fi tile in the Control Center) lists the networks nea
 to join it, and it asks for a password only when it needs one. Right-click the icon for the
 full network settings.
 
+**RGB Controller** (in the launcher, or `rgb-controller`) finds every light it can control (the
+motherboard, graphics card, memory, lighting headers, headsets and more, through OpenRGB) and sets
+them all to one colour, effect, brightness and speed. It also lists what it found but can't
+control, and why. Your choice comes back at every login.
+
 The theme has soft interface sounds (panels, switches, screenshots, clips, notifications, volume).
 The **Sounds** switch in the Control Center turns them off. To change a sound, edit
 `~/.config/waybar/sounds/make-sounds.py` and run it.

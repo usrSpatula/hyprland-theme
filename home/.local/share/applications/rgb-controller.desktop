@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=RGB Controller
+Comment=Change the colour and effect of every light in the PC
+Exec=rgb-controller
+Icon=preferences-desktop-color
+Categories=Settings;HardwareSettings;
+StartupWMClass=rgb-controller

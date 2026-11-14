@@ -28,3 +28,5 @@
 .local/bin/panel
 .local/bin/spotlight-launcher
 .local/bin/ui-sound
+.local/bin/rgb-controller
+.local/share/applications/rgb-controller.desktop
