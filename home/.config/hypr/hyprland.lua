@@ -644,14 +644,15 @@ pcall(function()
         no_anim      = true,
     })
 end)
--- The overview (waybar/overview.py) blurs and darkens everything behind it, and zooms in a little
+-- The overview (waybar/overview.py) blurs and darkens everything behind it. It only fades:
+-- the desktops inside fly in by themselves, and zooming a whole blurred screen stutters
 pcall(function()
     hl.layer_rule({
         name         = "overview-glass",
         match        = { namespace = "^overview$" },
         blur         = true,
         ignore_alpha = 0,
-        animation    = "popin 94%",
+        animation    = "fade",
     })
 end)
 -- The volume popup (waybar/osd.py) is frosted glass and pops in with a bounce
