@@ -10,6 +10,8 @@
 #                                 asks for the password only if it needs one.
 #   gear-tools.py --bluetooth     Bluetooth devices nearby. Click one to pair and connect it.
 #   gear-tools.py --notifications The notifications you missed (kept by notify-log.py).
+#   gear-tools.py --sound         The master volume, a volume slider for every app that's playing
+#                                 sound, and which speakers and microphone to use.
 #   gear-tools.py --power         Lock, sleep, log out, restart and shut down. The last three
 #                                 need a second click.
 import datetime
@@ -62,6 +64,8 @@ TOOLS_CSS = b"""
 .tool-icon.wifi { background-color: #0a84ff; }
 .tool-icon.bluetooth { background-color: #0a84ff; }
 .tool-icon.bell { background-color: #ff453a; }
+.tool-icon.volume { background-color: #ff375f; }
+.sound-section { font-size: 10px; font-weight: 700; color: rgba(255, 255, 255, 0.5); padding: 4px 6px 0 6px; }
 .bt-kind { font-size: 13px; min-width: 20px; color: rgba(255, 255, 255, 0.85); }
 .wifi-name { font-size: 12px; font-weight: 500; }
 .wifi-name.active { font-weight: 700; }
@@ -1329,6 +1333,216 @@ def build_notifications(cc, Gtk, GLib, close):
     return panel, [], lambda: None
 
 
+# ---- Sound ----
+
+def pactl(*arguments):
+    try:
+        return subprocess.run(["pactl", *arguments], capture_output=True, text=True, timeout=5).stdout
+    except (OSError, subprocess.TimeoutExpired):
+        return ""
+
+
+def pactl_list(kind):
+    try:
+        return json.loads(pactl("-f", "json", "list", kind))
+    except ValueError:
+        return []
+
+
+def percent_of(item):
+    levels = [int(channel["value_percent"].rstrip("%")) for channel in item.get("volume", {}).values()]
+    return max(levels) if levels else 0
+
+
+def sound_apps():
+    """Everything playing sound right now, one entry per app (an app's separate streams, like
+    a browser's tabs, move together): {name: {"ids": [...], "level": 0-100, "muted": bool}}."""
+    apps = {}
+    for stream in pactl_list("sink-inputs"):
+        properties = stream.get("properties", {})
+        name = properties.get("application.name") or properties.get("media.name") or "Unknown"
+        # Voice chat reports its audio engine's name, not the app's
+        if "WEBRTC" in name or name.lower().startswith("audio"):
+            name = properties.get("application.process.binary") or name
+        name = re.sub(r"\.exe$", "", name)
+        app = apps.setdefault(name, {"ids": [], "level": 0, "muted": True})
+        app["ids"].append(str(stream["index"]))
+        app["level"] = max(app["level"], min(percent_of(stream), 100))
+        app["muted"] = app["muted"] and bool(stream.get("mute"))
+    return apps
+
+
+def sound_devices(kind):
+    """Speakers and headsets ("sinks") or microphones ("sources"): (name, title, is the one in use)."""
+    current = pactl("get-default-sink" if kind == "sinks" else "get-default-source").strip()
+    devices = []
+    for device in pactl_list(kind):
+        if device["name"].endswith(".monitor"):
+            continue
+        title = re.sub(r"\s*(Analog|Digital) Stereo.*$|\s*Mono$", "", device.get("description", device["name"]))
+        devices.append((device["name"], title.strip() or device["name"], device["name"] == current))
+    return devices
+
+
+def build_sound(cc, Gtk, GLib, close):
+    parts = Parts(cc, Gtk, GLib)
+    panel = parts.panel(340)
+    state = {"rows": {}, "closed": False, "names": None, "devices": None}
+
+    header, summary = parts.header("volume", "Sound")
+    panel.pack_start(header, False, False, 0)
+
+    def speaker_button(muted, on_click):
+        button = cc.css_classes(Gtk.Button(), "flat")
+        icon = cc.icon_label("muted" if muted else "volume", "slider-icon")
+        button.add(icon)
+        button.connect("clicked", lambda *_: on_click())
+
+        def show(is_muted):
+            icon.set_markup(f"<span font_family='{cc.ICON_FONT}' font_weight='900'>"
+                            f"{cc.ICONS['muted' if is_muted else 'volume']}</span>")
+        return button, show
+
+    # Master volume: everything, on whichever speakers or headset is in use
+    master = {"muted": False}
+
+    def set_master(value):
+        run("wpctl", "set-volume", "@DEFAULT_AUDIO_SINK@", f"{value / 100:.2f}")
+        run("wpctl", "set-mute", "@DEFAULT_AUDIO_SINK@", "0")
+        master["muted"] = False
+        show_master(False)
+
+    def mute_master():
+        run("wpctl", "set-mute", "@DEFAULT_AUDIO_SINK@", "toggle")
+        read_master()
+
+    master_button, show_master = speaker_button(False, mute_master)
+    master_row, master_slider = cc.build_slider(master_button, set_master)
+    panel.pack_start(cc.slider_tile("Volume", master_row), False, False, 0)
+
+    def read_master():
+        level, muted = cc.read_volume()
+        master["muted"] = muted
+        master_slider.set_value(level)
+        show_master(muted)
+
+    apps_title = parts.label("APPS", "sound-section")
+    panel.pack_start(apps_title, False, False, 0)
+    apps_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
+    scroller = parts.scroller(apps_box, 300)
+    panel.pack_start(scroller, False, False, 0)
+    devices_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
+    panel.pack_start(devices_box, False, False, 0)
+
+    def build_app(name, app):
+        tile = cc.css_classes(Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6), "tile", "item")
+        title = parts.label(name, "wifi-name")
+        title.set_ellipsize(3)
+        tile.pack_start(title, False, False, 0)
+        entry = {"app": app}
+
+        def set_level(value):
+            # Not waited for, so the slider keeps up with the mouse however many streams there are
+            for stream in entry["app"]["ids"]:
+                spawn("pactl", "set-sink-input-volume", stream, f"{round(value)}%")
+                if entry["app"]["muted"]:
+                    spawn("pactl", "set-sink-input-mute", stream, "0")
+            entry["app"]["muted"] = False
+            entry["app"]["level"] = round(value)
+            entry["show"](False)
+
+        def mute():
+            muted = not entry["app"]["muted"]
+            for stream in entry["app"]["ids"]:
+                run("pactl", "set-sink-input-mute", stream, "1" if muted else "0")
+            entry["app"]["muted"] = muted
+            entry["show"](muted)
+
+        button, entry["show"] = speaker_button(app["muted"], mute)
+        row, entry["slider"] = cc.build_slider(button, set_level)
+        entry["slider"].set_value(app["level"])
+        tile.pack_start(row, False, False, 0)
+        entry["tile"] = tile
+        return entry
+
+    def show_apps(apps):
+        # The list is only rebuilt when an app starts or stops playing, so a slider you're
+        # dragging is never pulled out from under the mouse
+        if list(apps) != state["names"]:
+            state["names"] = list(apps)
+            for child in apps_box.get_children():
+                child.destroy()
+            state["rows"] = {}
+            for name in sorted(apps, key=str.lower):
+                state["rows"][name] = build_app(name, apps[name])
+                apps_box.pack_start(state["rows"][name]["tile"], False, False, 0)
+            if not apps:
+                apps_box.pack_start(parts.label("Nothing is playing sound right now.", "empty", 0.5),
+                                    False, False, 0)
+            apps_box.show_all()
+            parts.fit_height(scroller, apps_box, 300)
+        else:
+            for name, app in apps.items():
+                row = state["rows"][name]
+                row["app"] = app
+                if abs(row["slider"].value - app["level"]) >= 1:
+                    row["slider"].set_value(app["level"])
+                row["show"](app["muted"])
+
+    def choose(kind, name):
+        cc.sound("on")
+        run("pactl", "set-default-sink" if kind == "sinks" else "set-default-source", name)
+        if kind == "sinks":
+            # Sound that's already playing moves over too, not just what starts afterwards
+            for stream in pactl_list("sink-inputs"):
+                run("pactl", "move-sink-input", str(stream["index"]), name)
+        state["devices"] = None
+        refresh()
+
+    def show_devices(devices):
+        if devices == state["devices"]:
+            return
+        state["devices"] = devices
+        for child in devices_box.get_children():
+            child.destroy()
+        for kind, title in (("sinks", "OUTPUT"), ("sources", "MICROPHONE")):
+            if len(devices[kind]) < 2:
+                continue   # nothing to choose between
+            devices_box.pack_start(parts.label(title, "sound-section"), False, False, 0)
+            for name, label, current in devices[kind]:
+                row = cc.css_classes(Gtk.Box(spacing=9), "tile", "item")
+                text = parts.label(label, "wifi-name")
+                text.set_ellipsize(3)
+                cc.set_class(text, "active", current)
+                row.pack_start(text, True, True, 0)
+                if current:
+                    row.pack_start(cc.css_classes(cc.icon_label("check", "wifi-mark"), "active"), False, False, 0)
+                devices_box.pack_start(parts.hover_row(
+                    row, "item", lambda kind=kind, name=name: choose(kind, name)), False, False, 0)
+        using = next((label for _name, label, current in devices["sinks"] if current), "")
+        summary.set_text(using)
+        devices_box.show_all()
+
+    def refresh():
+        def work():
+            return sound_apps(), {"sinks": sound_devices("sinks"), "sources": sound_devices("sources")}
+
+        def done(result):
+            if not state["closed"]:
+                show_apps(result[0])
+                show_devices(result[1])
+                read_master()
+            return False
+
+        threading.Thread(target=lambda: GLib.idle_add(done, work()), daemon=True).start()
+        return True
+
+    show_apps(sound_apps())
+    show_devices({"sinks": sound_devices("sinks"), "sources": sound_devices("sources")})
+    read_master()
+    return panel, [GLib.timeout_add(1500, refresh)], lambda: state.update(closed=True)
+
+
 def build_power(cc, Gtk, GLib, close):
     parts = Parts(cc, Gtk, GLib)
     panel = parts.panel(240)
@@ -1378,6 +1592,7 @@ PANELS = {
     "--wifi": ("local.waybar.Wifi", build_wifi, 320),
     "--bluetooth": ("local.waybar.Bluetooth", build_bluetooth, 320),
     "--notifications": ("local.waybar.Notifications", build_notifications, 360),
+    "--sound": ("local.waybar.Sound", build_sound, 340),
     "--power": ("local.waybar.Power", build_power, 240),
 }
 

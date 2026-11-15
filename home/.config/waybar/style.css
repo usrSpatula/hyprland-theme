@@ -137,35 +137,6 @@ tooltip label {
 }
 
 
-/* Slide-out volume slider: thin rounded track with a white knob, macOS-style */
-#pulseaudio-slider {
-    padding: 0 4px 0 10px;
-}
-#pulseaudio-slider slider:hover {
-    box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.22), 0 1px 3px rgba(0, 0, 0, 0.4);
-}
-#pulseaudio-slider slider {
-    transition: box-shadow 140ms ease-out;
-    min-height: 12px;
-    min-width: 12px;
-    margin: -4px 0;
-    border-radius: 6px;
-    background: #ffffff;
-    border: none;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
-}
-#pulseaudio-slider trough {
-    min-height: 4px;
-    min-width: 90px;
-    border-radius: 2px;
-    background-color: rgba(255, 255, 255, 0.25);
-}
-#pulseaudio-slider highlight {
-    min-height: 4px;
-    border-radius: 2px;
-    background-color: #ffffff;
-}
-
 /* The gear drawer's icons are pictures too (made from the icon font), so they can grow smoothly */
 #custom-gear, #custom-clips, #custom-clipboard, #custom-screenshots, #custom-power {
     font-size: 1px;

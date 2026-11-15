@@ -14,7 +14,7 @@
     "modules-center": ["custom/notch"],
     "modules-right": [
         "tray",
-        "group/volume",
+        "pulseaudio",
         "bluetooth",
         "network",
         "custom/search",
@@ -156,29 +156,15 @@
         "on-click-right": "blueman-manager"
     },
 
-    // Volume: hover the icon and a slider slides out; scroll to nudge, click to mute
-    "group/volume": {
-        "orientation": "horizontal",
-        "drawer": {
-            "transition-duration": 300,
-            "children-class": "volume-drawer",
-            "transition-left-to-right": false
-        },
-        "modules": ["pulseaudio", "pulseaudio/slider"]
-    },
-
+    // Volume: click for the sound panel (master volume, a slider per app, and which speakers
+    // and microphone to use); scroll to nudge the volume, right-click to mute
     "pulseaudio": {
         "format": " ",
         "format-muted": " ",
         "tooltip-format": "Volume: {volume}%",
         "scroll-step": 5,
-        "on-click": "wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle"
-    },
-
-    "pulseaudio/slider": {
-        "min": 0,
-        "max": 100,
-        "orientation": "horizontal"
+        "on-click": "$HOME/.local/bin/panel sound",
+        "on-click-right": "wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle"
     },
 
     "network": {

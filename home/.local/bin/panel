@@ -1,7 +1,7 @@
 #!/bin/sh
 # Opens one of the bar's panels, or closes it if it's already open.
 #   panel control-center | clips | clipboard | screenshots | wifi | bluetooth | notifications |
-#         power | overview
+#         sound | power | overview
 #   panel --warm     starts them all in the background, hidden (Hyprland runs this at login)
 #
 # Each panel is a small program that keeps running once started, so a click only has to
@@ -17,6 +17,7 @@ app() {
         wifi)           id=local.waybar.Wifi;          set -- "$dir/gear-tools.py" --wifi ;;
         bluetooth)      id=local.waybar.Bluetooth;     set -- "$dir/gear-tools.py" --bluetooth ;;
         notifications)  id=local.waybar.Notifications; set -- "$dir/gear-tools.py" --notifications ;;
+        sound)          id=local.waybar.Sound;         set -- "$dir/gear-tools.py" --sound ;;
         power)          id=local.waybar.Power;         set -- "$dir/gear-tools.py" --power ;;
         overview)       id=local.waybar.Overview;      set -- "$dir/overview.py" ;;
         *) echo "panel: no panel called $1" >&2; exit 1 ;;
@@ -33,7 +34,7 @@ app() {
 
 if [ "$1" = --warm ]; then
     standby=1
-    for name in control-center clips clipboard screenshots wifi bluetooth notifications power overview; do
+    for name in control-center clips clipboard screenshots wifi bluetooth notifications sound power overview; do
         app "$name"
     done
 else

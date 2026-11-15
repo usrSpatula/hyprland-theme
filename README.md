@@ -77,6 +77,9 @@ full network settings.
 **Super+Tab** opens the overview: every desktop drawn small with its real windows in it. Click a
 window to go to it (arrow keys and Enter work too), or press Esc.
 
+The volume icon opens the sound panel: the master volume, a slider for every app that's playing
+sound, and which speakers and microphone to use.
+
 The Bluetooth icon lists devices nearby and pairs and connects them with a click. The bell keeps
 the notifications you missed, with a red dot while there are unread ones.
 
