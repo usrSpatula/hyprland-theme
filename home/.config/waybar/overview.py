@@ -7,8 +7,8 @@ The pictures are live: windows keep updating while the overview is open.
 
 Click a window to go to it, click a desktop's empty space to go to that desktop, or press Esc.
 Arrow keys move between windows, Enter goes to the highlighted one, and 1-9 jump to a desktop.
-The desktops fly in one after another, and the one under the mouse comes forward, leans with
-the mouse and catches the light, while the others step back.
+The desktop under the mouse comes forward, leans with the mouse and catches the light, while
+the others step back.
 
 It stays running between uses (see ~/.local/bin/panel), so it opens at once and remembers
 the last pictures of your windows while it takes new ones.
@@ -45,11 +45,9 @@ LABEL_HEIGHT = 34     # room under each desktop for its name
 MAX_COLUMNS = 3
 CARD_RADIUS = 18
 WINDOW_RADIUS = 8
-ENTER_SECONDS = 0.5   # how long a desktop takes to fly in
-ENTER_STAGGER = 0.04  # and how long each one waits for the one before it
-LIVE_SECONDS = 0.07   # how often a window you can see (or are pointing at) is pictured again
+LIVE_SECONDS = 0.12   # how often a window you can see (or are pointing at) is pictured again
 IDLE_SECONDS = 1.5    # and one on a hidden desktop, which isn't drawing anything new anyway
-CAMERAS = 2           # how many windows are pictured at the same time
+CAMERAS = 1           # how many windows are pictured at the same time
 REDRAW_MARGIN = 120   # how far past a desktop its shadow, lean and growth can reach
 STILL_MARGIN = 72     # room around a desktop's kept picture for its shadow
 
@@ -147,7 +145,8 @@ def shrink(data, width, height):
 
 def read_desktops():
     """The desktops that exist, in order, each with its monitor and its windows (back to
-    front); the desktop you're on; and the desktops showing on a monitor right now."""
+    front); the desktop you're on; the desktops showing on a monitor right now; and the
+    monitor the overview will open on."""
     monitors = {monitor["id"]: monitor for monitor in hyprctl("monitors")}
     desktops = {}
     for workspace in hyprctl("workspaces"):
@@ -163,18 +162,20 @@ def read_desktops():
         desktop["windows"].sort(key=lambda w: (w["floating"], -w["focusHistoryID"]))
     active = {monitor["activeWorkspace"]["id"] for monitor in monitors.values() if monitor["focused"]}
     showing = {monitor["activeWorkspace"]["id"] for monitor in monitors.values()}
-    return [desktops[number] for number in sorted(desktops)], active, showing
+    focused = next((monitor for monitor in monitors.values() if monitor["focused"]), None)
+    return [desktops[number] for number in sorted(desktops)], active, showing, focused
 
 
 def open_overview(app, on_closed):
-    desktops, active, showing = read_desktops()
+    desktops, active, showing, focused = read_desktops()
     state = {"spots": [], "cards": [], "current": None, "closing": False, "size": None}
     # Everything that moves has a number that chases a target a little each frame:
     #   lift[key]   how far a desktop or window has come forward (0 at rest, 1 under the mouse);
     #               it's on a spring, so it eases in and settles
     #   tilt        which way the desktop under the mouse leans, from where the mouse is on it
     motion = {"lift": {}, "speed": {}, "tilt": [0.0, 0.0], "tilt_speed": [0.0, 0.0], "pointer": None,
-              "began": None, "last": None, "ticking": False, "ticked": 0.0}
+              "last": None, "ticking": False, "ticked": 0.0}
+    frames = []   # (when, how long it took to draw, what part of the screen) for every frame
     cameras = ThreadPoolExecutor(max_workers=CAMERAS)
     filming = set()
 
@@ -192,9 +193,31 @@ def open_overview(app, on_closed):
     area = Gtk.DrawingArea()
     window.add(area)
 
+    def write_frame_log():
+        """Leaves a short report of how smoothly this opening ran, for tuning (it's read with
+        `cat $XDG_RUNTIME_DIR/overview-frames.log`)."""
+        if len(frames) < 3:
+            return
+        gaps = sorted(1000 * (b[0] - a[0]) for a, b in zip(frames, frames[1:]) if b[0] - a[0] < 0.1)
+        draws = sorted(1000 * frame[1] for frame in frames)
+        whole = sum(1 for frame in frames if frame[2][2] - frame[2][0] > 1900)
+        if not gaps:
+            return
+        report = (f"frames {len(frames)} ({whole} of the whole screen)  "
+                  f"between frames ms: typical {gaps[len(gaps) // 2]:.1f}, slow tenth {gaps[len(gaps) * 9 // 10]:.1f}, "
+                  f"worst {gaps[-1]:.1f}  "
+                  f"drawing ms: typical {draws[len(draws) // 2]:.1f}, slow tenth {draws[len(draws) * 9 // 10]:.1f}, "
+                  f"worst {draws[-1]:.1f}\n")
+        try:
+            with open(Path(GLib.get_user_runtime_dir()) / "overview-frames.log", "a") as log:
+                log.write(report)
+        except OSError:
+            pass
+
     def close(*_):
         if not state["closing"]:
             state["closing"] = True
+            write_frame_log()
             cameras.shutdown(wait=False, cancel_futures=True)
             cc.sound("close")
             window.destroy()
@@ -245,6 +268,11 @@ def open_overview(app, on_closed):
             now = time.monotonic()
             current = state["current"]
             pointed = current["desktop"] if current else None
+            if motion["ticking"]:
+                # Each picture makes Hyprland stop and copy a window out of the graphics card,
+                # which shows up as a stutter. So none are taken while anything is moving
+                time.sleep(0.03)
+                continue
             for spot in list(state["spots"]):
                 if "window" not in spot:
                     continue
@@ -252,9 +280,7 @@ def open_overview(app, on_closed):
                 if address in filming or now < due.get(address, 0):
                     continue
                 lively = spot["desktop"] in showing or spot["desktop"] == pointed
-                # While things are moving the cameras ease off, so the motion gets the processor
-                pause = LIVE_SECONDS * (3 if motion["ticking"] else 1)
-                due[address] = now + (pause if lively else IDLE_SECONDS)
+                due[address] = now + (LIVE_SECONDS if lively else IDLE_SECONDS)
                 filming.add(address)
                 try:
                     cameras.submit(film, spot)
@@ -314,13 +340,9 @@ def open_overview(app, on_closed):
 
     def step(_area, clock):
         now = clock.get_frame_time() / 1e6
-        if motion["began"] is None:
-            motion["began"] = now
         elapsed = min(now - (motion["last"] or now), 0.03)
         motion["last"] = now
-        flying = now - motion["began"] < ENTER_SECONDS + ENTER_STAGGER * len(desktops) + 0.05
-        moving = flying
-        lifting = False
+        moving = lifting = False
 
         keys = [desktop["id"] for desktop in desktops] + [
             spot["window"]["address"] for spot in state["spots"] if "window" in spot]
@@ -357,11 +379,9 @@ def open_overview(app, on_closed):
             motion["ticking"], motion["last"] = False, None
         # Only the parts of the screen that changed are drawn again. Redrawing all of it every
         # frame (and having the blur behind it redone) is what holds the frame rate down
-        if flying or not moving:
-            area.queue_draw()
-        elif lifting:
+        if lifting or not moving:
             for card in state["cards"]:   # the dimming of the others changes with it
-                smudge(card)
+                smudge(card)   # (and the frame things come to rest on is drawn the careful way)
         else:
             for card in state["cards"]:
                 if current is not None and card["desktop"]["id"] == current["desktop"]:
@@ -378,19 +398,6 @@ def open_overview(app, on_closed):
             motion["ticking"] = True
             area.add_tick_callback(step)
 
-    def arrival(index):
-        """How far a desktop has flown in: (place 0..1 with a small bounce, opacity 0..1)."""
-        if motion["began"] is None:
-            return 0.0, 0.0
-        if motion["last"] is None:
-            return 1.0, 1.0
-        t = (motion["last"] - motion["began"] - index * ENTER_STAGGER) / ENTER_SECONDS
-        if t <= 0:
-            return 0.0, 0.0
-        if t >= 1:
-            return 1.0, 1.0
-        return 1 - math.exp(-7 * t) * math.cos(7 * t), min(1.0, t * 4)
-
     def quick(cr):
         # While things are moving, pictures are stretched the fast way; the frame they come to
         # rest on is drawn the careful way, so it ends sharp
@@ -399,7 +406,7 @@ def open_overview(app, on_closed):
 
     # ---- Drawing ----
 
-    def backdrop(cr, width, height):
+    def backdrop(width, height):
         """Darkness behind everything, a little lighter in the middle so the edges fall away."""
         if (width, height) not in backdrops:
             backdrops.clear()
@@ -412,8 +419,15 @@ def open_overview(app, on_closed):
             pen.set_source(fade)
             pen.paint()
             backdrops[(width, height)] = picture
-        cr.set_source_surface(backdrops[(width, height)], 0, 0)
-        cr.paint()
+        return backdrops[(width, height)]
+
+    def prepare(width, height):
+        """Works out the layout and draws every kept picture for a screen of this size."""
+        state["size"] = (width, height)
+        layout(width, height)
+        backdrop(width, height)
+        for card in state["cards"]:
+            resting(card)
 
     def card_wallpaper(cr, card):
         size = (round(card["w"]), round(card["h"]))
@@ -473,42 +487,74 @@ def open_overview(app, on_closed):
         cr.stroke()
         cr.restore()
 
+    def glass_edge(pen, card):
+        # Bright along the top where light would catch it, fading down the sides
+        edge = cairo.LinearGradient(0, card["y"], 0, card["y"] + card["h"])
+        here = card["desktop"]["id"] in active
+        edge.add_color_stop_rgba(0, 1, 1, 1, 0.95 if here else 0.5)
+        edge.add_color_stop_rgba(0.5, 1, 1, 1, 0.6 if here else 0.14)
+        edge.add_color_stop_rgba(1, 1, 1, 1, 0.45 if here else 0.08)
+        rounded(pen, card["x"] + 0.75, card["y"] + 0.75, card["w"] - 1.5, card["h"] - 1.5, CARD_RADIUS)
+        pen.set_source(edge)
+        pen.set_line_width(2 if here else 1.5)
+        pen.stroke()
+
     def resting(card):
-        """A desktop at rest (its shadow, wallpaper, windows and glass edge), drawn once and
-        kept as a picture until one of its windows changes. Each frame the desktops are stamped
-        from these, and only what's moving (the window under the mouse, the light, the glow)
-        is drawn on top. That's what keeps the motion smooth."""
+        """A desktop's kept pictures: its "face" (wallpaper, windows and glass edge) and its
+        "still" (the face sitting on its shadow). A desktop at rest is stamped from its still
+        in one go; one that's leaning has its face drawn slanted over a separate shadow. When
+        a window's live picture changes, just that window's patch is painted over."""
         desktop = card["desktop"]
-        key = (card["x"], card["y"], card["w"],
-               tuple(versions.get(item["address"], 0) for item in desktop["windows"]))
+        spots = windows_of(desktop)
+        key = (card["x"], card["y"], card["w"], len(spots))
         kept = stills.get(desktop["id"])
+        was, motion["ticking"] = motion["ticking"], False   # kept pictures are drawn carefully
         if not kept or kept[0] != key:
-            still = cairo.ImageSurface(cairo.FORMAT_ARGB32, card["w"] + 2 * STILL_MARGIN,
-                                       card["h"] + 2 * STILL_MARGIN)
-            pen = cairo.Context(still)
-            pen.translate(STILL_MARGIN - card["x"], STILL_MARGIN - card["y"])
-            cast(pen, card["x"], card["y"], card["w"], card["h"], CARD_RADIUS, 30, 0.9, 12)
+            face = cairo.ImageSurface(cairo.FORMAT_ARGB32, card["w"], card["h"])
+            pen = cairo.Context(face)
+            pen.translate(-card["x"], -card["y"])
             pen.save()
             rounded(pen, card["x"], card["y"], card["w"], card["h"], CARD_RADIUS)
             pen.clip()
             card_wallpaper(pen, card)
-            was, motion["ticking"] = motion["ticking"], False   # the kept picture is drawn carefully
-            for spot in windows_of(desktop):
+            for spot in spots:
                 draw_window(pen, spot, 0.0)
-            motion["ticking"] = was
             pen.restore()
-            # A glass edge: bright along the top where light would catch it, fading down the sides
-            edge = cairo.LinearGradient(0, card["y"], 0, card["y"] + card["h"])
-            here = desktop["id"] in active
-            edge.add_color_stop_rgba(0, 1, 1, 1, 0.95 if here else 0.5)
-            edge.add_color_stop_rgba(0.5, 1, 1, 1, 0.6 if here else 0.14)
-            edge.add_color_stop_rgba(1, 1, 1, 1, 0.45 if here else 0.08)
-            rounded(pen, card["x"] + 0.75, card["y"] + 0.75, card["w"] - 1.5, card["h"] - 1.5, CARD_RADIUS)
-            pen.set_source(edge)
-            pen.set_line_width(2 if here else 1.5)
-            pen.stroke()
-            kept = stills[desktop["id"]] = (key, still)
-        return kept[1]
+            glass_edge(pen, card)
+            still = cairo.ImageSurface(cairo.FORMAT_ARGB32, card["w"] + 2 * STILL_MARGIN,
+                                       card["h"] + 2 * STILL_MARGIN)
+            pen = cairo.Context(still)
+            cast(pen, STILL_MARGIN, STILL_MARGIN, card["w"], card["h"], CARD_RADIUS, 30, 0.9, 12)
+            pen.set_source_surface(face, STILL_MARGIN, STILL_MARGIN)
+            pen.paint()
+            kept = stills[desktop["id"]] = (key, still, {}, face)
+        else:
+            shown = kept[2]
+            for index, spot in enumerate(spots):
+                address = spot["window"]["address"]
+                if shown.get(address) == versions.get(address, 0):
+                    continue
+                # Just this window's patch of the face, then whatever lies on top of it there
+                pen = cairo.Context(kept[3])
+                pen.translate(-card["x"], -card["y"])
+                pen.rectangle(spot["x"], spot["y"], spot["w"], spot["h"])
+                pen.clip()
+                rounded(pen, card["x"], card["y"], card["w"], card["h"], CARD_RADIUS)
+                pen.clip()
+                for above in spots[index:]:
+                    draw_window(pen, above, 0.0)
+                glass_edge(pen, card)
+                # ... and the same patch of the still
+                pen = cairo.Context(kept[1])
+                pen.rectangle(STILL_MARGIN + spot["x"] - card["x"], STILL_MARGIN + spot["y"] - card["y"],
+                              spot["w"], spot["h"])
+                pen.clip()
+                pen.set_source_surface(kept[3], STILL_MARGIN, STILL_MARGIN)
+                pen.paint()
+        for spot in spots:
+            kept[2][spot["window"]["address"]] = versions.get(spot["window"]["address"], 0)
+        motion["ticking"] = was
+        return kept
 
     def glow(reach):
         """The light that follows the mouse: a soft white spot, drawn once and then stamped."""
@@ -524,38 +570,35 @@ def open_overview(app, on_closed):
             lights.update(reach=reach, spot=spot)
         return lights["spot"]
 
-    def draw_card(cr, card, index, focus):
+    def draw_card(cr, card, focus):
         desktop = card["desktop"]
-        place, opacity = arrival(index)
-        if opacity <= 0:
-            return
         rise = motion["lift"].get(desktop["id"], 0.0)
         held = max(0.0, min(rise, 1.0))
-        lean = motion["tilt"] if held > 0.003 else (0.0, 0.0)
         centre_x, centre_y = card["x"] + card["w"] / 2, card["y"] + card["h"] / 2
         current = state["current"]
+        _key, still, _shown, face = resting(card)
 
-        cr.save()
-        # Flying in from below and slightly small; then, under the mouse, forward and leaning.
-        # The lean is a slant of the whole card, which reads as it turning away from the mouse
-        cr.translate(centre_x, centre_y + (1 - place) * 54)
-        cr.transform(cairo.Matrix(1, lean[0] * 0.03 * held, lean[1] * 0.03 * held, 1, 0, 0))
-        grow = (0.84 + 0.16 * place) * (1 + 0.06 * rise)
-        cr.scale(grow, grow)
-        cr.translate(-centre_x, -centre_y)
-
-        if held > 0.02:
-            # Coming forward, its shadow deepens, spreads and slips away from the mouse
-            cast(cr, card["x"] - lean[0] * 16 * held, card["y"], card["w"], card["h"], CARD_RADIUS, 36,
-                 0.85 * held, round(10 + 22 * held - lean[1] * 8 * held), motion["ticking"])
-        cr.set_source_surface(resting(card), card["x"] - STILL_MARGIN, card["y"] - STILL_MARGIN)
-        quick(cr)
-        if opacity < 1:
-            cr.paint_with_alpha(opacity)
-        else:
+        if abs(rise) < 0.003:
+            # At rest: stamped whole, shadow and all, exactly on the pixels. This is the fast case
+            cr.set_source_surface(still, card["x"] - STILL_MARGIN, card["y"] - STILL_MARGIN)
             cr.paint()
-
-        if held > 0.01:
+        else:
+            lean = motion["tilt"]
+            # Coming forward, its shadow deepens, spreads and slips away from the mouse. The
+            # shadows are stamped straight (cheap); only the desktop itself is drawn slanted
+            cast(cr, card["x"], card["y"], card["w"], card["h"], CARD_RADIUS, 30, 0.9, 12)
+            cast(cr, card["x"] - lean[0] * 16 * held, card["y"], card["w"], card["h"], CARD_RADIUS, 36,
+                 0.85 * held, round(10 + 22 * held - lean[1] * 8 * held))
+            cr.save()
+            # The lean is a slant of the whole card, which reads as it turning away from the mouse
+            cr.translate(centre_x, centre_y)
+            cr.transform(cairo.Matrix(1, lean[0] * 0.03 * held, lean[1] * 0.03 * held, 1, 0, 0))
+            grow = 1 + 0.06 * rise
+            cr.scale(grow, grow)
+            cr.translate(-centre_x, -centre_y)
+            cr.set_source_surface(face, card["x"], card["y"])
+            quick(cr)
+            cr.paint()
             cr.save()
             rounded(cr, card["x"], card["y"], card["w"], card["h"], CARD_RADIUS)
             cr.clip()
@@ -563,7 +606,7 @@ def open_overview(app, on_closed):
                 lifted = motion["lift"].get(spot["window"]["address"], 0.0)
                 if lifted > 0.01:
                     draw_window(cr, spot, lifted, lean)
-            if motion["pointer"]:
+            if motion["pointer"] and held > 0.01:
                 # A soft light that follows the mouse across the desktop, like a reflection
                 reach = round(card["w"] * 0.7)
                 cr.set_source_surface(glow(reach), round(centre_x + lean[0] * card["w"] / 2) - reach,
@@ -575,6 +618,7 @@ def open_overview(app, on_closed):
                 cr.set_source_rgba(1, 1, 1, alpha)
                 cr.set_line_width(width)
                 cr.stroke()
+            cr.restore()
         if focus > 0.01 and held < 0.99:
             # While one desktop is forward, the others step back into the dark
             rounded(cr, card["x"], card["y"], card["w"], card["h"], CARD_RADIUS)
@@ -588,18 +632,21 @@ def open_overview(app, on_closed):
         elif not desktop["windows"]:
             name += "   ·   empty"
         text(cr, name, card["x"], card["y"] + card["h"] + 12, card["w"], 14, 600,
-             (0.6 + 0.4 * max(held, 1.0 * here)) * opacity)
-        cr.restore()
+             0.6 + 0.4 * max(held, 1.0 * here))
 
     def draw(_area, cr):
+        began = time.perf_counter()
+        try:
+            return paint(cr)
+        finally:
+            frames.append((began, time.perf_counter() - began, cr.clip_extents()))
+
+    def paint(cr):
         width, height = area.get_allocated_width(), area.get_allocated_height()
         if state["size"] != (width, height):
-            state["size"] = (width, height)
-            layout(width, height)
-            if len(state["spots"]) and not state.get("directing"):
-                state["directing"] = True
-                threading.Thread(target=direct, daemon=True).start()
-        backdrop(cr, width, height)
+            prepare(width, height)
+        cr.set_source_surface(backdrop(width, height), 0, 0)
+        cr.paint()
         # How strongly any desktop is being held forward, which dims the rest
         focus = max([0.0] + [min(motion["lift"].get(card["desktop"]["id"], 0.0), 1.0) for card in state["cards"]])
         # The one under the mouse is drawn last, on top of its neighbours
@@ -611,7 +658,7 @@ def open_overview(app, on_closed):
             if (card["x"] - REDRAW_MARGIN < right and card["x"] + card["w"] + REDRAW_MARGIN > left
                     and card["y"] - REDRAW_MARGIN < bottom
                     and card["y"] + card["h"] + REDRAW_MARGIN + LABEL_HEIGHT > top):
-                draw_card(cr, card, index, focus)
+                draw_card(cr, card, focus)
         if bottom > height - 40:
             text(cr, "Click a window to go to it   ·   arrows and Enter work too   ·   Esc closes",
                  0, height - 34, width, 12, 500, 0.5)
@@ -683,9 +730,14 @@ def open_overview(app, on_closed):
             del pictures[address]
             versions.pop(address, None)
 
+    # Everything is drawn before the window appears, so its very first frame is the finished
+    # picture. Hyprland then zooms and fades that picture in on the graphics card, which is
+    # smooth however busy the processor is
+    if focused:
+        prepare(focused["width"], focused["height"])
     cc.sound("open")
-    window.connect("map-event", lambda *_: animate())
     window.show_all()
+    threading.Thread(target=direct, daemon=True).start()
     return close
 
 
