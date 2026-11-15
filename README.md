@@ -74,6 +74,12 @@ The Wi-Fi icon (and the Wi-Fi tile in the Control Center) lists the networks nea
 to join it, and it asks for a password only when it needs one. Right-click the icon for the
 full network settings.
 
+**Super+Tab** opens the overview: every desktop drawn small with its real windows in it. Click a
+window to go to it (arrow keys and Enter work too), or press Esc.
+
+The Bluetooth icon lists devices nearby and pairs and connects them with a click. The bell keeps
+the notifications you missed, with a red dot while there are unread ones.
+
 **RGB Controller** (in the launcher, or `rgb-controller`) finds every light it can control (the
 motherboard, graphics card, memory, lighting headers, headsets and more, through OpenRGB) and sets
 them all to one colour, effect, brightness and speed. It also lists what it found but can't

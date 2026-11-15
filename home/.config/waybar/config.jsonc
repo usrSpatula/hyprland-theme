@@ -18,6 +18,7 @@
         "bluetooth",
         "network",
         "custom/search",
+        "custom/notifications",
         "clock"
     ],
 
@@ -151,7 +152,8 @@
         "format-disabled": " ",
         "tooltip-format": "Bluetooth: {status}",
         "tooltip-format-connected": "{device_alias}",
-        "on-click": "blueman-manager"
+        "on-click": "$HOME/.local/bin/panel bluetooth",
+        "on-click-right": "blueman-manager"
     },
 
     // Volume: hover the icon and a slider slides out; scroll to nudge, click to mute
@@ -187,6 +189,17 @@
         "tooltip-format-ethernet": "{ifname}",
         "on-click": "$HOME/.local/bin/panel wifi",
         "on-click-right": "nm-connection-editor"
+    },
+
+    // The bell: notifications you missed (kept by notify-log.py). It shows a red dot while there
+    // are ones you haven't looked at; the recorder and the panel send signal 8 to redraw it
+    "custom/notifications": {
+        "exec": "[ -e \"${XDG_STATE_HOME:-$HOME/.local/state}/notifications-unseen\" ] && echo '{\"text\": \" \", \"class\": \"unread\"}' || echo '{\"text\": \" \"}'",
+        "return-type": "json",
+        "interval": "once",
+        "signal": 8,
+        "tooltip": false,
+        "on-click": "$HOME/.local/bin/panel notifications"
     },
 
     "custom/search": {

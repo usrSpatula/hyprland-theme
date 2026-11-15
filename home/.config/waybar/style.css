@@ -23,6 +23,7 @@ window#waybar {
 #pulseaudio,
 #network,
 #custom-search,
+#custom-notifications,
 #clock {
     transition: background-color 160ms ease-out, color 160ms ease-out;
     background: transparent;
@@ -58,7 +59,8 @@ window#waybar {
 #bluetooth,
 #pulseaudio,
 #network,
-#custom-search {
+#custom-search,
+#custom-notifications {
     font-size: 1px;
     min-width: 16px;
     padding: 0 5px;
@@ -73,6 +75,8 @@ window#waybar {
 #network          { background-image: url("icons/wifi.svg"); }
 #network.ethernet { background-image: url("icons/ethernet.svg"); }
 #custom-search    { background-image: url("icons/search.svg"); }
+#custom-notifications        { background-image: url("icons/bell.svg"); }
+#custom-notifications.unread { background-image: url("icons/bell-unread.svg"); }
 
 #clock {
     padding: 0 12px 0 8px;
@@ -88,6 +92,7 @@ window#waybar {
 #pulseaudio:hover,
 #network:hover,
 #custom-search:hover,
+#custom-notifications:hover,
 #clock:hover {
     background-color: rgba(255, 255, 255, 0.18);
 }
@@ -189,11 +194,11 @@ tooltip label {
     70%  { background-size: 19px 19px; }
     100% { background-size: 20px 20px; }
 }
-#bluetooth, #pulseaudio, #network, #custom-search,
+#bluetooth, #pulseaudio, #network, #custom-search, #custom-notifications,
 #custom-gear, #custom-clips, #custom-clipboard, #custom-screenshots, #custom-power {
     transition: background-color 160ms ease-out, background-size 180ms ease-out, opacity 200ms ease-out;
 }
-#bluetooth:hover, #pulseaudio:hover, #network:hover, #custom-search:hover, #custom-gear:hover, #custom-clips:hover, #custom-clipboard:hover,
+#bluetooth:hover, #pulseaudio:hover, #network:hover, #custom-search:hover, #custom-notifications:hover, #custom-gear:hover, #custom-clips:hover, #custom-clipboard:hover,
 #custom-screenshots:hover, #custom-power:hover {
     background-size: 20px 20px;
     animation: small-hover 420ms ease-out;
@@ -204,6 +209,10 @@ tooltip label {
 #network:hover            { background-image: url("icons/wifi-big.svg"); }
 #network.ethernet:hover   { background-image: url("icons/ethernet-big.svg"); }
 #custom-search:hover      { background-image: url("icons/search-big.svg"); }
+#custom-notifications:hover        { background-image: url("icons/bell-big.svg"); }
+#custom-notifications.unread:hover { background-image: url("icons/bell-unread-big.svg"); }
+/* A new notification makes the bell jump */
+#custom-notifications.unread { animation: state-b 520ms ease-out; }
 #custom-gear:hover        { background-image: url("icons/gear-big.svg"); }
 #custom-clips:hover       { background-image: url("icons/clips-big.svg"); }
 #custom-clipboard:hover   { background-image: url("icons/clipboard-big.svg"); }

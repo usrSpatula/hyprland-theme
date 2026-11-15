@@ -895,15 +895,15 @@ def build_panel(close):
             close()
         return open_settings
 
-    # Four equal tiles in a 2x2 grid. Clicking the Wi-Fi tile opens the list of networks
-    # (gear-tools.py --wifi) and the Bluetooth tile its settings; the round icon still flips them.
+    # Four equal tiles in a 2x2 grid. Clicking the Wi-Fi or Bluetooth tile opens its list
+    # (gear-tools.py --wifi / --bluetooth); the round icon still flips them.
     toggles = []
     grid = Gtk.Grid(row_spacing=8, column_spacing=8, row_homogeneous=True, column_homogeneous=True)
     for index, (icon, title, read, write, on_tile_click, font) in enumerate((
             ("wifi", "Wi-Fi", wifi_state, set_wifi,
              opener(os.path.expanduser("~/.local/bin/panel"), "wifi"), ICON_FONT),
             ("moon", "Do Not Disturb", dnd_state, set_dnd, None, ICON_FONT),
-            ("bluetooth", "Bluetooth", bluetooth_state, set_bluetooth, opener("blueman-manager"), BRAND_FONT),
+            ("bluetooth", "Bluetooth", bluetooth_state, set_bluetooth, opener(os.path.expanduser("~/.local/bin/panel"), "bluetooth"), BRAND_FONT),
             ("night", "Night Shift", night_state, set_night, None, ICON_FONT))):
         tile, toggle = toggle_tile(icon, title, read, write, on_tile_click, font)
         grid.attach(tile, index % 2, index // 2, 1, 1)

@@ -8,15 +8,20 @@
 #   gear-tools.py --notes         A scratchpad that saves as you type.
 #   gear-tools.py --wifi          Nearby Wi-Fi networks, strongest first. Click one to connect; it
 #                                 asks for the password only if it needs one.
+#   gear-tools.py --bluetooth     Bluetooth devices nearby. Click one to pair and connect it.
+#   gear-tools.py --notifications The notifications you missed (kept by notify-log.py).
 #   gear-tools.py --power         Lock, sleep, log out, restart and shut down. The last three
 #                                 need a second click.
 import datetime
 import hashlib
 import importlib.util
+import json
+import os
 import re
 import subprocess
 import sys
 import threading
+import time
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -43,6 +48,9 @@ ICONS = {
     "search": "", "pin": "", "trash": "", "copy": "", "check": "",
     "folder": "", "camera": "", "eraser": "",
     "wifi": "\uf1eb", "rescan": "\uf021", "eye": "\uf06e", "settings": "\uf013",
+    "bluetooth": "\uf294", "headphones": "\uf025", "speaker": "\uf028", "keyboard": "\uf11c",
+    "mouse": "\uf8cc", "gamepad": "\uf11b", "phone": "\uf3cd", "laptop": "\uf109",
+    "bell": "\uf0f3", "xmark": "\uf00d",
 }
 
 TOOLS_CSS = b"""
@@ -52,6 +60,9 @@ TOOLS_CSS = b"""
 .tool-icon.note { background-color: #ffd60a; color: #1c1c1e; }
 .tool-icon.power { background-color: #ff453a; }
 .tool-icon.wifi { background-color: #0a84ff; }
+.tool-icon.bluetooth { background-color: #0a84ff; }
+.tool-icon.bell { background-color: #ff453a; }
+.bt-kind { font-size: 13px; min-width: 20px; color: rgba(255, 255, 255, 0.85); }
 .wifi-name { font-size: 12px; font-weight: 500; }
 .wifi-name.active { font-weight: 700; }
 .wifi-mark { font-size: 10px; color: rgba(255, 255, 255, 0.55); min-width: 14px; }
@@ -176,11 +187,11 @@ class Parts:
         panel.set_size_request(width, -1)
         return panel
 
-    def header(self, icon, title):
+    def header(self, icon, title, font=None):
         """The tile at the top: a coloured icon, a title, a line under it, and room for buttons."""
         Gtk = self.Gtk
         header = self.cc.css_classes(Gtk.Box(spacing=11), "tile")
-        badge = self.cc.icon_label(icon, "tool-icon")
+        badge = self.cc.icon_label(icon, "tool-icon", font=font or self.cc.ICON_FONT)
         self.cc.css_classes(badge, icon)
         badge.set_valign(Gtk.Align.CENTER)
         header.pack_start(badge, False, False, 0)
@@ -977,6 +988,347 @@ def build_wifi(cc, Gtk, GLib, close):
     return panel, timers, lambda: state.update(closed=True)
 
 
+# ---- Bluetooth ----
+
+BLUETOOTH_KINDS = {"audio-headset": "headphones", "audio-headphones": "headphones", "audio-card": "speaker",
+                   "input-keyboard": "keyboard", "input-mouse": "mouse", "input-gaming": "gamepad",
+                   "phone": "phone", "computer": "laptop"}
+
+
+def bluetoothctl(*arguments, timeout=30):
+    """Runs bluetoothctl. Returns (worked, what it printed)."""
+    try:
+        result = subprocess.run(["bluetoothctl", *arguments], capture_output=True, text=True, timeout=timeout)
+    except (OSError, subprocess.TimeoutExpired):
+        return False, ""
+    output = result.stdout + result.stderr
+    return result.returncode == 0 and "Failed" not in output and "not available" not in output, output
+
+
+def bluetooth_devices():
+    """Every device Bluetooth knows or can hear: connected first, then paired, then the rest.
+    Ones that only announce an address, with no name, are left out."""
+    devices = []
+    for line in bluetoothctl("devices")[1].splitlines():
+        parts = line.split(" ", 2)
+        if len(parts) < 3 or parts[0] != "Device":
+            continue
+        address, name = parts[1], parts[2]
+        info = bluetoothctl("info", address)[1]
+
+        def field(key):
+            found = re.search(rf"^\s*{key}: (.*)$", info, re.MULTILINE)
+            return found.group(1).strip() if found else ""
+
+        if name.replace("-", ":").upper() == address.upper():
+            continue
+        battery = re.search(r"\((\d+)\)", field("Battery Percentage"))
+        devices.append({"address": address, "name": field("Alias") or name,
+                        "paired": field("Paired") == "yes", "connected": field("Connected") == "yes",
+                        "kind": BLUETOOTH_KINDS.get(field("Icon"), "bluetooth"),
+                        "battery": int(battery.group(1)) if battery else None})
+    return sorted(devices, key=lambda d: (not d["connected"], not d["paired"], d["name"].lower()))
+
+
+def build_bluetooth(cc, Gtk, GLib, close):
+    parts = Parts(cc, Gtk, GLib)
+    panel = parts.panel(320)
+    state = {"devices": [], "on": True, "open": None, "busy": None, "error": None,
+             "loading": False, "closed": False}
+
+    header, summary = parts.header("bluetooth", "Bluetooth", cc.BRAND_FONT)
+    switch = Gtk.Switch()
+    switch.set_valign(Gtk.Align.CENTER)
+    switch.set_tooltip_text("Turn Bluetooth on or off")
+    header.pack_start(switch, False, False, 0)
+    panel.pack_start(header, False, False, 0)
+
+    rows = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
+    scroller = parts.scroller(rows, LIST_HEIGHT)
+    panel.pack_start(scroller, False, False, 0)
+
+    def in_background(work, then):
+        def body():
+            result = work()
+            GLib.idle_add(lambda: (None if state["closed"] else then(result)) and False)
+        threading.Thread(target=body, daemon=True).start()
+
+    def pill(text, on_click, blue=False):
+        button = cc.css_classes(Gtk.Button(label=text), "pill", *(["blue"] if blue else []))
+        button.connect("clicked", lambda *_: on_click())
+        return button
+
+    def act(device, work, sound=None):
+        state["busy"], state["open"], state["error"] = device["address"], None, None
+        show()
+
+        def done(worked):
+            state["busy"] = None
+            if worked and sound:
+                cc.sound(sound)
+            if not worked:
+                state["open"] = device["address"]
+                state["error"] = ("Couldn't connect. Make sure it's switched on and in pairing mode."
+                                  if sound == "on" else "That didn't work. Try again.")
+            load()
+
+        in_background(work, done)
+
+    def connect(device):
+        address = device["address"]
+
+        def work():
+            if not device["paired"]:
+                if not bluetoothctl("pair", address, timeout=40)[0]:
+                    return False
+                bluetoothctl("trust", address)   # so it reconnects by itself next time
+            return bluetoothctl("connect", address, timeout=40)[0]
+
+        act(device, work, "on")
+
+    def on_row(device):
+        if state["busy"]:
+            return
+        state["error"] = None
+        if device["connected"] or device["paired"]:
+            # Opens the row: Connect or Disconnect, and Forget
+            state["open"] = None if state["open"] == device["address"] else device["address"]
+            show()
+        else:
+            connect(device)
+
+    def build_row(device):
+        address = device["address"]
+        busy = state["busy"] == address
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        line = cc.css_classes(Gtk.Box(spacing=9), "tile", "item")
+        font = cc.BRAND_FONT if device["kind"] == "bluetooth" else cc.ICON_FONT
+        line.pack_start(cc.icon_label(device["kind"], "bt-kind", font=font), False, False, 0)
+        titles = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        titles.set_valign(Gtk.Align.CENTER)
+        title = parts.label(device["name"], "wifi-name")
+        title.set_ellipsize(3)
+        cc.set_class(title, "active", device["connected"])
+        titles.pack_start(title, False, False, 0)
+        note = ("Connecting…" if busy else "Connected" if device["connected"]
+                else "Paired" if device["paired"] else "")
+        if device["connected"] and device["battery"] is not None and not busy:
+            note += f"  ·  {device['battery']}% battery"
+        if note:
+            titles.pack_start(parts.label(note, "item-sub"), False, False, 0)
+        line.pack_start(titles, True, True, 0)
+        if busy:
+            spinner = Gtk.Spinner()
+            spinner.start()
+            line.pack_start(spinner, False, False, 0)
+        elif device["connected"]:
+            line.pack_start(cc.css_classes(cc.icon_label("check", "wifi-mark"), "active"), False, False, 0)
+        box.pack_start(parts.hover_row(line, "item", lambda: on_row(device)), False, False, 0)
+
+        if state["open"] != address or busy:
+            return box
+        detail = cc.css_classes(Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=5), "wifi-detail")
+        detail.set_margin_top(5)
+        buttons = Gtk.Box(spacing=6)
+        if device["connected"]:
+            buttons.pack_start(pill("Disconnect", lambda: act(
+                device, lambda: bluetoothctl("disconnect", address)[0], "off")), False, False, 0)
+        else:
+            buttons.pack_start(pill("Connect", lambda: connect(device), blue=True), False, False, 0)
+        if device["paired"]:
+            buttons.pack_start(pill("Forget", lambda: act(
+                device, lambda: bluetoothctl("remove", address)[0])), False, False, 0)
+        detail.pack_start(buttons, False, False, 0)
+        if state["error"]:
+            error = parts.label(state["error"], "wifi-error")
+            error.set_line_wrap(True)
+            error.set_max_width_chars(40)
+            detail.pack_start(error, False, False, 0)
+        box.pack_start(detail, False, False, 0)
+        return box
+
+    def show():
+        for child in rows.get_children():
+            child.destroy()
+        connected = [d["name"] for d in state["devices"] if d["connected"]]
+        summary.set_text("Off" if not state["on"] else f"Connected to {', '.join(connected)}" if connected
+                         else "Looking for devices…")
+        if not state["on"]:
+            rows.pack_start(parts.label("Bluetooth is off.", "empty", 0.5), False, False, 0)
+        elif not state["devices"]:
+            rows.pack_start(parts.label("Put a device in pairing mode and it will show up here.",
+                                        "empty", 0.5), False, False, 0)
+        for device in state["devices"] if state["on"] else []:
+            rows.pack_start(build_row(device), False, False, 0)
+        settings = cc.css_classes(Gtk.Box(spacing=9), "tile", "item")
+        settings.pack_start(cc.icon_label("settings", "wifi-mark"), False, False, 0)
+        settings.pack_start(parts.label("Bluetooth settings…", "wifi-name"), True, True, 0)
+        rows.pack_start(parts.hover_row(settings, "item", lambda: (spawn("blueman-manager"), close())),
+                        False, False, 0)
+        rows.show_all()
+        parts.fit_height(scroller, rows, LIST_HEIGHT)
+
+    def load():
+        if state["loading"]:
+            return
+        state["loading"] = True
+
+        def work():
+            on = "Powered: yes" in bluetoothctl("show")[1]
+            return on, bluetooth_devices() if on else []
+
+        def done(result):
+            state["on"], state["devices"] = result
+            state["loading"] = False
+            set_switch(state["on"])
+            show()
+
+        in_background(work, done)
+
+    def listen():
+        # Searches for new devices for as long as the panel is open (each search lasts 8 seconds)
+        while not state["closed"]:
+            if state["on"]:
+                bluetoothctl("--timeout", "8", "scan", "on", timeout=12)
+            else:
+                threading.Event().wait(2)
+
+    def on_switch(_switch, _value):
+        turn_on = switch.get_active()
+        cc.sound("on" if turn_on else "off")
+        state["on"], state["open"], state["error"] = turn_on, None, None
+        if not turn_on:
+            state["devices"] = []
+        show()
+        in_background(lambda: bluetoothctl("power", "on" if turn_on else "off"), lambda _result: load())
+
+    switch_handler = switch.connect("notify::active", on_switch)
+
+    def set_switch(on):
+        switch.handler_block(switch_handler)
+        switch.set_active(on)
+        switch.handler_unblock(switch_handler)
+
+    def refresh():
+        # Never while a row is open or connecting, so nothing moves under the mouse
+        if not (state["open"] or state["busy"]):
+            load()
+        return True
+
+    def cancel_edit():
+        if state["open"] and not state["busy"]:
+            state["open"], state["error"] = None, None
+            show()
+            return True
+        return False
+
+    panel.cancel_edit = cancel_edit
+    state["on"] = "Powered: yes" in bluetoothctl("show")[1]
+    state["devices"] = bluetooth_devices() if state["on"] else []
+    set_switch(state["on"])
+    show()
+    threading.Thread(target=listen, daemon=True).start()
+    return panel, [GLib.timeout_add_seconds(3, refresh)], lambda: state.update(closed=True)
+
+
+# ---- Notification history ----
+
+NOTIFICATIONS = Path(os.environ.get("XDG_STATE_HOME") or Path.home() / ".local/state") / "notifications.json"
+NOTIFICATIONS_UNSEEN = NOTIFICATIONS.with_name("notifications-unseen")
+
+
+def load_notifications():
+    try:
+        return json.loads(NOTIFICATIONS.read_text())
+    except (OSError, ValueError):
+        return []
+
+
+def refresh_bell():
+    # Waybar redraws the bell when it gets this signal (see "custom/notifications" in config.jsonc)
+    spawn("pkill", "-RTMIN+8", "-x", "waybar")
+
+
+def time_ago(stamp):
+    seconds = max(0, time.time() - stamp)
+    if seconds < 60:
+        return "just now"
+    if seconds < 3600:
+        return f"{int(seconds // 60)} min ago"
+    if seconds < 86400:
+        return f"{int(seconds // 3600)} h ago"
+    return datetime.datetime.fromtimestamp(stamp).strftime("%-d %b")
+
+
+def build_notifications(cc, Gtk, GLib, close):
+    parts = Parts(cc, Gtk, GLib)
+    panel = parts.panel(360)
+    entries = load_notifications()
+    # Opening the panel counts as having seen them
+    NOTIFICATIONS_UNSEEN.unlink(missing_ok=True)
+    refresh_bell()
+
+    header, summary = parts.header("bell", "Notifications")
+    rows = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
+
+    def save():
+        NOTIFICATIONS.write_text(json.dumps(entries))
+        update()
+
+    def update():
+        summary.set_text(f"{len(entries)} kept" if entries else "Nothing new")
+        if not entries:
+            for child in rows.get_children():
+                child.destroy()
+            rows.pack_start(parts.label("Notifications you miss are kept here.", "empty", 0.5), False, False, 0)
+            rows.show_all()
+
+    def clear():
+        entries.clear()
+        save()
+
+    header.pack_start(parts.armed_button("trash", "Clear all", "Click again to clear them all", clear),
+                      False, False, 0)
+    panel.pack_start(header, False, False, 0)
+
+    for entry in reversed(entries):
+        box = cc.css_classes(Gtk.Box(spacing=9), "tile", "item")
+        texts = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=1)
+        top = f"{entry.get('app') or 'Notification'}  ·  {time_ago(entry.get('time', 0))}"
+        texts.pack_start(parts.label(top, "item-sub"), False, False, 0)
+        title = parts.label(entry.get("summary", ""), "wifi-name")
+        title.set_ellipsize(3)
+        texts.pack_start(title, False, False, 0)
+        body = re.sub(r"<[^>]+>", "", entry.get("body", "")).strip()
+        if body:
+            text = parts.label(body, "item-text")
+            text.set_line_wrap(True)
+            text.set_lines(3)
+            text.set_ellipsize(3)
+            text.set_max_width_chars(40)
+            texts.pack_start(text, False, False, 0)
+        box.pack_start(texts, True, True, 0)
+        holder = {}
+
+        def dismiss(entry=entry, holder=holder):
+            if entry in entries:
+                entries.remove(entry)
+            holder["row"].destroy()
+            save()
+
+        remove = parts.button("xmark", "Remove", dismiss)
+        remove.set_valign(Gtk.Align.START)
+        box.pack_start(remove, False, False, 0)
+        holder["row"] = parts.hover_row(box, "item")
+        rows.pack_start(holder["row"], False, False, 0)
+
+    scroller = parts.scroller(rows, LIST_HEIGHT)
+    panel.pack_start(scroller, False, False, 0)
+    update()
+    parts.fit_height(scroller, rows, LIST_HEIGHT)
+    return panel, [], lambda: None
+
+
 def build_power(cc, Gtk, GLib, close):
     parts = Parts(cc, Gtk, GLib)
     panel = parts.panel(240)
@@ -1024,6 +1376,8 @@ PANELS = {
     "--screenshots": ("local.waybar.Screenshots", build_screenshots, SHOT_COLUMNS * (SHOT_WIDTH + 14) + 30),
     "--notes": ("local.waybar.Notes", build_notes, 360),
     "--wifi": ("local.waybar.Wifi", build_wifi, 320),
+    "--bluetooth": ("local.waybar.Bluetooth", build_bluetooth, 320),
+    "--notifications": ("local.waybar.Notifications", build_notifications, 360),
     "--power": ("local.waybar.Power", build_power, 240),
 }
 

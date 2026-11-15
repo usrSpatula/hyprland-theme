@@ -436,6 +436,8 @@ hl.bind(mainMod .. " + M", hl.dsp.exec_cmd("command -v hyprshutdown >/dev/null 2
 hl.bind(mainMod .. " + E", hl.dsp.exec_cmd(fileManager))
 hl.bind(mainMod .. " + V", hl.dsp.window.float({ action = "toggle" }))
 hl.bind(mainMod .. " + D", hl.dsp.exec_cmd(menu))
+-- Overview: every desktop and window on one screen (see ~/.config/waybar/overview.py)
+hl.bind(mainMod .. " + Tab", hl.dsp.exec_cmd("$HOME/.local/bin/panel overview"))
 hl.bind(mainMod .. " + P", hl.dsp.window.pseudo())
 hl.bind(mainMod .. " + J", hl.dsp.layout("togglesplit"))    -- dwindle only
 
@@ -577,6 +579,8 @@ hl.on("hyprland.start", function()
     hl.exec_cmd("mako")
     -- Starts the bar's panels hidden, so the first click on one opens it at once
     hl.exec_cmd("sleep 3; $HOME/.local/bin/panel --warm")
+    -- Keeps the notifications you miss, for the bell in the bar
+    hl.exec_cmd("python3 $HOME/.config/waybar/notify-log.py")
     -- Puts back the lighting chosen in RGB Controller (it does nothing until you've used the app)
     hl.exec_cmd("$HOME/.local/bin/rgb-controller --apply")
     -- Clip recorder, switched off until you turn it on (see ~/.config/waybar/clips.py)
@@ -638,6 +642,16 @@ pcall(function()
         blur         = true,
         ignore_alpha = 0.55,
         no_anim      = true,
+    })
+end)
+-- The overview (waybar/overview.py) blurs and darkens everything behind it, and zooms in a little
+pcall(function()
+    hl.layer_rule({
+        name         = "overview-glass",
+        match        = { namespace = "^overview$" },
+        blur         = true,
+        ignore_alpha = 0,
+        animation    = "popin 94%",
     })
 end)
 -- The volume popup (waybar/osd.py) is frosted glass and pops in with a bounce
