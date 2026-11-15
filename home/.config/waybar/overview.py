@@ -49,7 +49,8 @@ ENTER_SECONDS = 0.5   # how long a desktop takes to fly in
 ENTER_STAGGER = 0.04  # and how long each one waits for the one before it
 LIVE_SECONDS = 0.07   # how often a window you can see (or are pointing at) is pictured again
 IDLE_SECONDS = 1.5    # and one on a hidden desktop, which isn't drawing anything new anyway
-CAMERAS = 3           # how many windows are pictured at the same time
+CAMERAS = 2           # how many windows are pictured at the same time
+REDRAW_MARGIN = 120   # how far past a desktop its shadow, lean and growth can reach
 STILL_MARGIN = 72     # room around a desktop's kept picture for its shadow
 
 # Kept between openings, so the overview has something to show the instant it opens
@@ -228,8 +229,10 @@ def open_overview(app, on_closed):
             if small is not None:
                 pictures[address] = (small.get_width(), small.get_height(), small)
                 versions[address] = versions.get(address, 0) + 1
-                if not state["closing"] and not motion["ticking"]:
-                    area.queue_draw()
+                if not state["closing"]:
+                    for card in state["cards"]:
+                        if card["desktop"]["id"] == spot["desktop"]:
+                            smudge(card)
             return False
 
         GLib.idle_add(keep)
@@ -249,7 +252,9 @@ def open_overview(app, on_closed):
                 if address in filming or now < due.get(address, 0):
                     continue
                 lively = spot["desktop"] in showing or spot["desktop"] == pointed
-                due[address] = now + (LIVE_SECONDS if lively else IDLE_SECONDS)
+                # While things are moving the cameras ease off, so the motion gets the processor
+                pause = LIVE_SECONDS * (3 if motion["ticking"] else 1)
+                due[address] = now + (pause if lively else IDLE_SECONDS)
                 filming.add(address)
                 try:
                     cameras.submit(film, spot)
@@ -313,7 +318,9 @@ def open_overview(app, on_closed):
             motion["began"] = now
         elapsed = min(now - (motion["last"] or now), 0.03)
         motion["last"] = now
-        moving = now - motion["began"] < ENTER_SECONDS + ENTER_STAGGER * len(desktops)
+        flying = now - motion["began"] < ENTER_SECONDS + ENTER_STAGGER * len(desktops) + 0.05
+        moving = flying
+        lifting = False
 
         keys = [desktop["id"] for desktop in desktops] + [
             spot["window"]["address"] for spot in state["spots"] if "window" in spot]
@@ -323,9 +330,11 @@ def open_overview(app, on_closed):
             speed += ((target - value) * 300 - speed * 27) * elapsed
             value += speed * elapsed
             if abs(target - value) < 0.002 and abs(speed) < 0.02:
+                if value != target:
+                    lifting = True
                 value, speed = target, 0.0
             else:
-                moving = True
+                moving = lifting = True
             motion["lift"][key], motion["speed"][key] = value, speed
 
         # The lean glides after the mouse, and eases back to flat when it leaves
@@ -346,8 +355,23 @@ def open_overview(app, on_closed):
         if not moving:
             # The frame it comes to rest on is drawn the careful way (see quick)
             motion["ticking"], motion["last"] = False, None
-        area.queue_draw()
+        # Only the parts of the screen that changed are drawn again. Redrawing all of it every
+        # frame (and having the blur behind it redone) is what holds the frame rate down
+        if flying or not moving:
+            area.queue_draw()
+        elif lifting:
+            for card in state["cards"]:   # the dimming of the others changes with it
+                smudge(card)
+        else:
+            for card in state["cards"]:
+                if current is not None and card["desktop"]["id"] == current["desktop"]:
+                    smudge(card)
         return moving
+
+    def smudge(card):
+        """Marks one desktop, with the room its shadow and lean take up, to be drawn again."""
+        area.queue_draw_area(card["x"] - REDRAW_MARGIN, card["y"] - REDRAW_MARGIN,
+                             card["w"] + 2 * REDRAW_MARGIN, card["h"] + 2 * REDRAW_MARGIN + LABEL_HEIGHT)
 
     def animate():
         if not motion["ticking"] and not state["closing"]:
@@ -581,10 +605,16 @@ def open_overview(app, on_closed):
         # The one under the mouse is drawn last, on top of its neighbours
         order = sorted(enumerate(state["cards"]),
                        key=lambda pair: motion["lift"].get(pair[1]["desktop"]["id"], 0.0))
+        left, top, right, bottom = cr.clip_extents()
         for index, card in order:
-            draw_card(cr, card, index, focus)
-        text(cr, "Click a window to go to it   ·   arrows and Enter work too   ·   Esc closes",
-             0, height - 34, width, 12, 500, 0.5)
+            # A desktop outside the part of the screen being redrawn is left as it is
+            if (card["x"] - REDRAW_MARGIN < right and card["x"] + card["w"] + REDRAW_MARGIN > left
+                    and card["y"] - REDRAW_MARGIN < bottom
+                    and card["y"] + card["h"] + REDRAW_MARGIN + LABEL_HEIGHT > top):
+                draw_card(cr, card, index, focus)
+        if bottom > height - 40:
+            text(cr, "Click a window to go to it   ·   arrows and Enter work too   ·   Esc closes",
+                 0, height - 34, width, 12, 500, 0.5)
         return True
 
     # ---- Mouse and keyboard ----
