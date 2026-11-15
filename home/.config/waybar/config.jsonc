@@ -17,8 +17,6 @@
         "pulseaudio",
         "bluetooth",
         "network",
-        "custom/search",
-        "custom/notifications",
         "clock"
     ],
 
@@ -157,12 +155,15 @@
     },
 
     // Volume: click for the sound panel (master volume, a slider per app, and which speakers
-    // and microphone to use); scroll to nudge the volume, right-click to mute
+    // and microphone to use); right-click to mute
     "pulseaudio": {
         "format": " ",
         "format-muted": " ",
         "tooltip-format": "Volume: {volume}%",
-        "scroll-step": 5,
+        // Scrolling over the icon does nothing, so the volume can't change by accident
+        "scroll-step": 0,
+        "on-scroll-up": "true",
+        "on-scroll-down": "true",
         "on-click": "$HOME/.local/bin/panel sound",
         "on-click-right": "wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle"
     },
@@ -175,23 +176,6 @@
         "tooltip-format-ethernet": "{ifname}",
         "on-click": "$HOME/.local/bin/panel wifi",
         "on-click-right": "nm-connection-editor"
-    },
-
-    // The bell: notifications you missed (kept by notify-log.py). It shows a red dot while there
-    // are ones you haven't looked at; the recorder and the panel send signal 8 to redraw it
-    "custom/notifications": {
-        "exec": "[ -e \"${XDG_STATE_HOME:-$HOME/.local/state}/notifications-unseen\" ] && echo '{\"text\": \" \", \"class\": \"unread\"}' || echo '{\"text\": \" \"}'",
-        "return-type": "json",
-        "interval": "once",
-        "signal": 8,
-        "tooltip": false,
-        "on-click": "$HOME/.local/bin/panel notifications"
-    },
-
-    "custom/search": {
-        "format": " ",
-        "tooltip": false,
-        "on-click": "wofi --show drun"
     },
 
     // "Sat 31 Oct  2:32 PM". Click for the Control Center (see control-center.py)

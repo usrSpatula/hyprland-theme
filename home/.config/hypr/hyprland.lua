@@ -579,8 +579,6 @@ hl.on("hyprland.start", function()
     hl.exec_cmd("mako")
     -- Starts the bar's panels hidden, so the first click on one opens it at once
     hl.exec_cmd("sleep 3; $HOME/.local/bin/panel --warm")
-    -- Keeps the notifications you miss, for the bell in the bar
-    hl.exec_cmd("python3 $HOME/.config/waybar/notify-log.py")
     -- Puts back the lighting chosen in RGB Controller (it does nothing until you've used the app)
     hl.exec_cmd("$HOME/.local/bin/rgb-controller --apply")
     -- Clip recorder, switched off until you turn it on (see ~/.config/waybar/clips.py)

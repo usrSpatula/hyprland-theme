@@ -22,8 +22,6 @@ window#waybar {
 #bluetooth,
 #pulseaudio,
 #network,
-#custom-search,
-#custom-notifications,
 #clock {
     transition: background-color 160ms ease-out, color 160ms ease-out;
     background: transparent;
@@ -58,9 +56,7 @@ window#waybar {
    off in the 24px bar and comes out blurry */
 #bluetooth,
 #pulseaudio,
-#network,
-#custom-search,
-#custom-notifications {
+#network {
     font-size: 1px;
     min-width: 16px;
     padding: 0 5px;
@@ -74,25 +70,23 @@ window#waybar {
 #bluetooth        { background-image: url("icons/bluetooth.svg"); }
 #network          { background-image: url("icons/wifi.svg"); }
 #network.ethernet { background-image: url("icons/ethernet.svg"); }
-#custom-search    { background-image: url("icons/search.svg"); }
-#custom-notifications        { background-image: url("icons/bell.svg"); }
-#custom-notifications.unread { background-image: url("icons/bell-unread.svg"); }
 
 #clock {
     padding: 0 12px 0 8px;
 }
 
+/* Apps running in the background sit apart from the system icons: a wide gap and a faint line */
 #tray {
-    padding: 0 5px;
-    margin: 2px 0;
+    padding: 0 16px 0 5px;
+    margin: 2px 14px 2px 0;
+    border-right: 1px solid rgba(255, 255, 255, 0.22);
+    border-radius: 0;   /* a straight line, not a bracket */
 }
 
 /* macOS-style hover highlight */
 #bluetooth:hover,
 #pulseaudio:hover,
 #network:hover,
-#custom-search:hover,
-#custom-notifications:hover,
 #clock:hover {
     background-color: rgba(255, 255, 255, 0.18);
 }
@@ -165,11 +159,11 @@ tooltip label {
     70%  { background-size: 19px 19px; }
     100% { background-size: 20px 20px; }
 }
-#bluetooth, #pulseaudio, #network, #custom-search, #custom-notifications,
+#bluetooth, #pulseaudio, #network,
 #custom-gear, #custom-clips, #custom-clipboard, #custom-screenshots, #custom-power {
     transition: background-color 160ms ease-out, background-size 180ms ease-out, opacity 200ms ease-out;
 }
-#bluetooth:hover, #pulseaudio:hover, #network:hover, #custom-search:hover, #custom-notifications:hover, #custom-gear:hover, #custom-clips:hover, #custom-clipboard:hover,
+#bluetooth:hover, #pulseaudio:hover, #network:hover, #custom-gear:hover, #custom-clips:hover, #custom-clipboard:hover,
 #custom-screenshots:hover, #custom-power:hover {
     background-size: 20px 20px;
     animation: small-hover 420ms ease-out;
@@ -179,11 +173,6 @@ tooltip label {
 #bluetooth:hover          { background-image: url("icons/bluetooth-big.svg"); }
 #network:hover            { background-image: url("icons/wifi-big.svg"); }
 #network.ethernet:hover   { background-image: url("icons/ethernet-big.svg"); }
-#custom-search:hover      { background-image: url("icons/search-big.svg"); }
-#custom-notifications:hover        { background-image: url("icons/bell-big.svg"); }
-#custom-notifications.unread:hover { background-image: url("icons/bell-unread-big.svg"); }
-/* A new notification makes the bell jump */
-#custom-notifications.unread { animation: state-b 520ms ease-out; }
 #custom-gear:hover        { background-image: url("icons/gear-big.svg"); }
 #custom-clips:hover       { background-image: url("icons/clips-big.svg"); }
 #custom-clipboard:hover   { background-image: url("icons/clipboard-big.svg"); }

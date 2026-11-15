@@ -12,7 +12,6 @@
 .config/waybar/notch.py
 .config/waybar/osd.py
 .config/waybar/overview.py
-.config/waybar/notify-log.py
 .config/waybar/control-center.py
 .config/waybar/clips.py
 # No button on the bar; clips.py borrows its game detection to name clips

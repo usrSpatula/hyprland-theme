@@ -80,8 +80,7 @@ window to go to it (arrow keys and Enter work too), or press Esc.
 The volume icon opens the sound panel: the master volume, a slider for every app that's playing
 sound, and which speakers and microphone to use.
 
-The Bluetooth icon lists devices nearby and pairs and connects them with a click. The bell keeps
-the notifications you missed, with a red dot while there are unread ones.
+The Bluetooth icon lists devices nearby and pairs and connects them with a click.
 
 **RGB Controller** (in the launcher, or `rgb-controller`) finds every light it can control (the
 motherboard, graphics card, memory, lighting headers, headsets and more, through OpenRGB) and sets

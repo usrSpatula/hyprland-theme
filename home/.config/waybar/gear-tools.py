@@ -9,7 +9,6 @@
 #   gear-tools.py --wifi          Nearby Wi-Fi networks, strongest first. Click one to connect; it
 #                                 asks for the password only if it needs one.
 #   gear-tools.py --bluetooth     Bluetooth devices nearby. Click one to pair and connect it.
-#   gear-tools.py --notifications The notifications you missed (kept by notify-log.py).
 #   gear-tools.py --sound         The master volume, a volume slider for every app that's playing
 #                                 sound, and which speakers and microphone to use.
 #   gear-tools.py --power         Lock, sleep, log out, restart and shut down. The last three
@@ -34,6 +33,8 @@ NOTES = DATA / "notes.txt"
 SCREENSHOTS = Path.home() / "Pictures" / "screenshot"   # Where ~/.config/hypr/screenshot.sh saves
 SCREENSHOT_SCRIPT = Path.home() / ".config" / "hypr" / "screenshot.sh"
 
+SOUND_WIDTH = 270         # the sound panel is kept small
+SOUND_APPS_HEIGHT = 170   # its list of apps scrolls past this height
 CLIPBOARD_LIMIT = 60
 LIST_HEIGHT = 420
 SHOT_WIDTH = 124
@@ -63,9 +64,12 @@ TOOLS_CSS = b"""
 .tool-icon.power { background-color: #ff453a; }
 .tool-icon.wifi { background-color: #0a84ff; }
 .tool-icon.bluetooth { background-color: #0a84ff; }
-.tool-icon.bell { background-color: #ff453a; }
 .tool-icon.volume { background-color: #ff375f; }
-.sound-section { font-size: 10px; font-weight: 700; color: rgba(255, 255, 255, 0.5); padding: 4px 6px 0 6px; }
+.sound-section { font-size: 9px; font-weight: 700; color: rgba(255, 255, 255, 0.5); padding: 2px 6px 0 6px; }
+.sound-row { padding: 5px 8px; border-radius: 11px; transition: background-color 140ms ease-out; }
+.sound-row.hover { background-color: rgba(255, 255, 255, 0.12); }
+.sound-app { font-size: 11px; font-weight: 500; }
+.sound-app.active { font-weight: 700; }
 .bt-kind { font-size: 13px; min-width: 20px; color: rgba(255, 255, 255, 0.85); }
 .wifi-name { font-size: 12px; font-weight: 500; }
 .wifi-name.active { font-weight: 700; }
@@ -1235,104 +1239,6 @@ def build_bluetooth(cc, Gtk, GLib, close):
     return panel, [GLib.timeout_add_seconds(3, refresh)], lambda: state.update(closed=True)
 
 
-# ---- Notification history ----
-
-NOTIFICATIONS = Path(os.environ.get("XDG_STATE_HOME") or Path.home() / ".local/state") / "notifications.json"
-NOTIFICATIONS_UNSEEN = NOTIFICATIONS.with_name("notifications-unseen")
-
-
-def load_notifications():
-    try:
-        return json.loads(NOTIFICATIONS.read_text())
-    except (OSError, ValueError):
-        return []
-
-
-def refresh_bell():
-    # Waybar redraws the bell when it gets this signal (see "custom/notifications" in config.jsonc)
-    spawn("pkill", "-RTMIN+8", "-x", "waybar")
-
-
-def time_ago(stamp):
-    seconds = max(0, time.time() - stamp)
-    if seconds < 60:
-        return "just now"
-    if seconds < 3600:
-        return f"{int(seconds // 60)} min ago"
-    if seconds < 86400:
-        return f"{int(seconds // 3600)} h ago"
-    return datetime.datetime.fromtimestamp(stamp).strftime("%-d %b")
-
-
-def build_notifications(cc, Gtk, GLib, close):
-    parts = Parts(cc, Gtk, GLib)
-    panel = parts.panel(360)
-    entries = load_notifications()
-    # Opening the panel counts as having seen them
-    NOTIFICATIONS_UNSEEN.unlink(missing_ok=True)
-    refresh_bell()
-
-    header, summary = parts.header("bell", "Notifications")
-    rows = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
-
-    def save():
-        NOTIFICATIONS.write_text(json.dumps(entries))
-        update()
-
-    def update():
-        summary.set_text(f"{len(entries)} kept" if entries else "Nothing new")
-        if not entries:
-            for child in rows.get_children():
-                child.destroy()
-            rows.pack_start(parts.label("Notifications you miss are kept here.", "empty", 0.5), False, False, 0)
-            rows.show_all()
-
-    def clear():
-        entries.clear()
-        save()
-
-    header.pack_start(parts.armed_button("trash", "Clear all", "Click again to clear them all", clear),
-                      False, False, 0)
-    panel.pack_start(header, False, False, 0)
-
-    for entry in reversed(entries):
-        box = cc.css_classes(Gtk.Box(spacing=9), "tile", "item")
-        texts = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=1)
-        top = f"{entry.get('app') or 'Notification'}  ·  {time_ago(entry.get('time', 0))}"
-        texts.pack_start(parts.label(top, "item-sub"), False, False, 0)
-        title = parts.label(entry.get("summary", ""), "wifi-name")
-        title.set_ellipsize(3)
-        texts.pack_start(title, False, False, 0)
-        body = re.sub(r"<[^>]+>", "", entry.get("body", "")).strip()
-        if body:
-            text = parts.label(body, "item-text")
-            text.set_line_wrap(True)
-            text.set_lines(3)
-            text.set_ellipsize(3)
-            text.set_max_width_chars(40)
-            texts.pack_start(text, False, False, 0)
-        box.pack_start(texts, True, True, 0)
-        holder = {}
-
-        def dismiss(entry=entry, holder=holder):
-            if entry in entries:
-                entries.remove(entry)
-            holder["row"].destroy()
-            save()
-
-        remove = parts.button("xmark", "Remove", dismiss)
-        remove.set_valign(Gtk.Align.START)
-        box.pack_start(remove, False, False, 0)
-        holder["row"] = parts.hover_row(box, "item")
-        rows.pack_start(holder["row"], False, False, 0)
-
-    scroller = parts.scroller(rows, LIST_HEIGHT)
-    panel.pack_start(scroller, False, False, 0)
-    update()
-    parts.fit_height(scroller, rows, LIST_HEIGHT)
-    return panel, [], lambda: None
-
-
 # ---- Sound ----
 
 def pactl(*arguments):
@@ -1386,11 +1292,17 @@ def sound_devices(kind):
 
 def build_sound(cc, Gtk, GLib, close):
     parts = Parts(cc, Gtk, GLib)
-    panel = parts.panel(340)
+    panel = parts.panel(SOUND_WIDTH)
     state = {"rows": {}, "closed": False, "names": None, "devices": None}
 
-    header, summary = parts.header("volume", "Sound")
-    panel.pack_start(header, False, False, 0)
+    def quiet(slider):
+        # The mouse wheel scrolls the list here; it never changes a volume by accident
+        slider.handler_block_by_func(slider.on_scroll)
+        return slider
+
+    panel.set_spacing(5)
+    summary = parts.label("", "sound-section")
+    panel.pack_start(summary, False, False, 0)
 
     def speaker_button(muted, on_click):
         button = cc.css_classes(Gtk.Button(), "flat")
@@ -1418,7 +1330,10 @@ def build_sound(cc, Gtk, GLib, close):
 
     master_button, show_master = speaker_button(False, mute_master)
     master_row, master_slider = cc.build_slider(master_button, set_master)
-    panel.pack_start(cc.slider_tile("Volume", master_row), False, False, 0)
+    quiet(master_slider)
+    master_tile = cc.css_classes(Gtk.Box(), "tile", "sound-row")
+    master_tile.pack_start(master_row, True, True, 0)
+    panel.pack_start(master_tile, False, False, 0)
 
     def read_master():
         level, muted = cc.read_volume()
@@ -1426,19 +1341,20 @@ def build_sound(cc, Gtk, GLib, close):
         master_slider.set_value(level)
         show_master(muted)
 
-    apps_title = parts.label("APPS", "sound-section")
-    panel.pack_start(apps_title, False, False, 0)
+    panel.pack_start(parts.label("APPS", "sound-section"), False, False, 0)
     apps_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
-    scroller = parts.scroller(apps_box, 300)
+    scroller = parts.scroller(apps_box, SOUND_APPS_HEIGHT)
     panel.pack_start(scroller, False, False, 0)
     devices_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
     panel.pack_start(devices_box, False, False, 0)
 
     def build_app(name, app):
-        tile = cc.css_classes(Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6), "tile", "item")
-        title = parts.label(name, "wifi-name")
+        # One line per app: mute, its name, and its slider
+        tile = cc.css_classes(Gtk.Box(spacing=6), "tile", "sound-row")
+        title = parts.label(name, "sound-app")
         title.set_ellipsize(3)
-        tile.pack_start(title, False, False, 0)
+        title.set_width_chars(11)
+        title.set_max_width_chars(11)
         entry = {"app": app}
 
         def set_level(value):
@@ -1459,9 +1375,12 @@ def build_sound(cc, Gtk, GLib, close):
             entry["show"](muted)
 
         button, entry["show"] = speaker_button(app["muted"], mute)
-        row, entry["slider"] = cc.build_slider(button, set_level)
+        button.set_valign(Gtk.Align.CENTER)
+        tile.pack_start(button, False, False, 0)
+        tile.pack_start(title, False, False, 0)
+        entry["slider"] = quiet(cc.Slider(set_level))
         entry["slider"].set_value(app["level"])
-        tile.pack_start(row, False, False, 0)
+        tile.pack_start(entry["slider"], True, True, 0)
         entry["tile"] = tile
         return entry
 
@@ -1480,7 +1399,7 @@ def build_sound(cc, Gtk, GLib, close):
                 apps_box.pack_start(parts.label("Nothing is playing sound right now.", "empty", 0.5),
                                     False, False, 0)
             apps_box.show_all()
-            parts.fit_height(scroller, apps_box, 300)
+            parts.fit_height(scroller, apps_box, SOUND_APPS_HEIGHT)
         else:
             for name, app in apps.items():
                 row = state["rows"][name]
@@ -1510,17 +1429,17 @@ def build_sound(cc, Gtk, GLib, close):
                 continue   # nothing to choose between
             devices_box.pack_start(parts.label(title, "sound-section"), False, False, 0)
             for name, label, current in devices[kind]:
-                row = cc.css_classes(Gtk.Box(spacing=9), "tile", "item")
-                text = parts.label(label, "wifi-name")
+                row = cc.css_classes(Gtk.Box(spacing=9), "tile", "sound-row")
+                text = parts.label(label, "sound-app")
                 text.set_ellipsize(3)
                 cc.set_class(text, "active", current)
                 row.pack_start(text, True, True, 0)
                 if current:
                     row.pack_start(cc.css_classes(cc.icon_label("check", "wifi-mark"), "active"), False, False, 0)
                 devices_box.pack_start(parts.hover_row(
-                    row, "item", lambda kind=kind, name=name: choose(kind, name)), False, False, 0)
+                    row, "sound-row", lambda kind=kind, name=name: choose(kind, name)), False, False, 0)
         using = next((label for _name, label, current in devices["sinks"] if current), "")
-        summary.set_text(using)
+        summary.set_text(using.upper() or "VOLUME")
         devices_box.show_all()
 
     def refresh():
@@ -1591,8 +1510,7 @@ PANELS = {
     "--notes": ("local.waybar.Notes", build_notes, 360),
     "--wifi": ("local.waybar.Wifi", build_wifi, 320),
     "--bluetooth": ("local.waybar.Bluetooth", build_bluetooth, 320),
-    "--notifications": ("local.waybar.Notifications", build_notifications, 360),
-    "--sound": ("local.waybar.Sound", build_sound, 340),
+    "--sound": ("local.waybar.Sound", build_sound, SOUND_WIDTH),
     "--power": ("local.waybar.Power", build_power, 240),
 }
 
