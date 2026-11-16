@@ -76,9 +76,12 @@ window { background-color: transparent; }
     background-color: rgba(30, 30, 34, 0.62);
     border: 1px solid rgba(255, 255, 255, 0.16);
     border-radius: 20px;
-    /* A wide soft shadow under a closer, tighter one. Together they stay fainter than the
-       blur's ignore_alpha in hyprland.lua, or the shadow would get frosted like the panel */
-    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.45), 0 6px 16px rgba(0, 0, 0, 0.22);
+    /* A soft shadow close under the panel, with a tighter one hugging its edge. GTK's blur
+       trails off much further than its number says: this one reaches about 40px, which has
+       to fit inside SHADOW_ROOM and TOP_ROOM or it gets cut off in a straight line. Together
+       they also stay fainter than the blur's ignore_alpha in hyprland.lua, or the shadow
+       would get frosted like the panel */
+    box-shadow: 0 8px 18px rgba(0, 0, 0, 0.36), 0 2px 5px rgba(0, 0, 0, 0.18);
     padding: 10px;
 }
 /* Scrollbars in every panel: a thin rounded pill that floats over the list, with no track,
