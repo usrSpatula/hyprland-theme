@@ -26,7 +26,9 @@ from gi.repository import GtkLayerShell  # noqa: E402  (after Gtk 3 is loaded)
 PANEL_WIDTH = 330
 BAR_HEIGHT = 28
 EDGE_GAP = 8
-SHADOW_ROOM = 34
+SHADOW_ROOM = 64   # clear space kept beside and below a panel for its shadow to fade out in
+TOP_ROOM = 30      # and above it. With less, the shadow is cut off in a straight line
+REST = BAR_HEIGHT + 6 - TOP_ROOM   # where a panel's holder rests so the panel sits just under the bar
 OPEN_DURATION = 240
 CLOSE_DURATION = 160
 SPRING_DROP = 30      # px a panel starts above its resting place
@@ -74,7 +76,9 @@ window { background-color: transparent; }
     background-color: rgba(30, 30, 34, 0.62);
     border: 1px solid rgba(255, 255, 255, 0.16);
     border-radius: 20px;
-    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.40), 0 1px 4px rgba(0, 0, 0, 0.30);
+    /* A wide soft shadow under a closer, tighter one. Together they stay fainter than the
+       blur's ignore_alpha in hyprland.lua, or the shadow would get frosted like the panel */
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.45), 0 6px 16px rgba(0, 0, 0, 0.22);
     padding: 10px;
 }
 /* Scrollbars in every panel: a thin rounded pill that floats over the list, with no track,
@@ -1096,13 +1100,13 @@ def open_window(app, on_closed):
     panel_area.connect("button-press-event", lambda *_: True)
     panel_area.set_margin_start(SHADOW_ROOM)
     panel_area.set_margin_end(EDGE_GAP)
-    panel_area.set_margin_top(6)
+    panel_area.set_margin_top(TOP_ROOM)
     panel_area.set_margin_bottom(SHADOW_ROOM + 10)
 
     revealer.set_transition_type(Gtk.RevealerTransitionType.SLIDE_DOWN)
     revealer.set_halign(Gtk.Align.END)
     revealer.set_valign(Gtk.Align.START)
-    revealer.set_margin_top(BAR_HEIGHT)
+    revealer.set_margin_top(REST)
     revealer.add(panel_area)
 
     window.add(revealer)
@@ -1116,7 +1120,7 @@ def open_window(app, on_closed):
 
 
 
-def drop_in(revealer, rest=BAR_HEIGHT):
+def drop_in(revealer, rest=REST):
     """Opens a panel. It's first laid out and drawn unseen for a couple of frames, because a big
     panel (like 100 screenshots) takes long enough to build that it would eat the animation and
     just snap into place. Then it slides, fades and bounces in. rest is how far down the
@@ -1172,7 +1176,7 @@ def spring_in(widget, rest):
             widget.set_margin_top(rest)
             return False
         offset = -SPRING_DROP * math.exp(-5 * t) * math.cos(13 * t)
-        widget.set_margin_top(round(rest + offset))
+        widget.set_margin_top(max(0, round(rest + offset)))
         return True
 
     widget.add_tick_callback(tick)

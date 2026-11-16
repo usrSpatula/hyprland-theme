@@ -984,12 +984,12 @@ def open_panel(app, cc, build, width, extra_css, on_closed=lambda: None, at_poin
     if at_pointer:
         panel.show_all()
         left, top = pointer_spot(width, panel.get_preferred_height()[1] + cc.SHADOW_ROOM + 10)
-        top = max(top - 6, 0)   # panel_area's own margin below adds the 6 back
+        top = max(top - cc.TOP_ROOM, 0)   # panel_area's own margin below adds it back
     else:
-        left, top = panel_left_edge(width), cc.BAR_HEIGHT
+        left, top = panel_left_edge(width), cc.REST
     panel_area.set_margin_start(min(left, cc.SHADOW_ROOM))
     panel_area.set_margin_end(cc.SHADOW_ROOM)
-    panel_area.set_margin_top(6)
+    panel_area.set_margin_top(cc.TOP_ROOM)
     panel_area.set_margin_bottom(cc.SHADOW_ROOM + 10)
 
     revealer.set_transition_type(Gtk.RevealerTransitionType.SLIDE_DOWN)
