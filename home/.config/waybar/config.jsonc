@@ -9,7 +9,6 @@
     "modules-left": [
         "custom/apple",
         "hyprland/workspaces",
-        "hyprland/window",
         "group/learning"
     ],
     "modules-center": ["custom/notch"],
