@@ -40,6 +40,8 @@ FADE_MS = 130        # a panel fades in as it drops, and out as it leaves
 ART_SIZE = 44
 SLIDER_HEIGHT = 22
 SCROLL_STEP = 5
+NEUTRAL_TEMPERATURE = 6500   # no tint; Night Shift fades between this and NIGHT_TEMPERATURE
+NIGHT_STEPS = 24
 NIGHT_TEMPERATURE = 4500
 REFRESH_SECONDS = 2
 BLUE = "#0a84ff"
@@ -350,7 +352,7 @@ def sunset_running():
 
 def night_state():
     on = NIGHT_FLAG.exists() and sunset_running()
-    return on, "Warm screen" if on else "Off"
+    return on, "On" if on else "Off"
 
 
 def set_night(on):
@@ -359,7 +361,7 @@ def set_night(on):
         NIGHT_FLAG.touch()
     else:
         NIGHT_FLAG.unlink(missing_ok=True)
-    dimmer.restart_sunset()
+    dimmer.fade_night(on)
 
 
 class Dimmer:
@@ -410,6 +412,32 @@ class Dimmer:
                 break
             time.sleep(0.02)
         spawn("hyprsunset", *(["-t", str(NIGHT_TEMPERATURE)] if night else ["-i"]), "-g", str(self.table))
+
+    def fade_night(self, on):
+        """Eases Night Shift's warm tint in or out, in small steps. (Hyprland can fade a colour
+        table change itself, but the screen drops to about 20 frames a second while it does;
+        stepping it from here costs far less.) Takes about a second, so not for the main thread."""
+        self.look_up()
+        running = sunset_running()
+        if on and not running:
+            spawn("hyprsunset", "-i", "-g", str(self.table))
+            for _ in range(40):   # until it answers
+                if "ok" in run("hyprctl", "hyprsunset", "gamma", str(self.table)):
+                    break
+                time.sleep(0.025)
+        elif not on and not running:
+            return
+        start, end = (NEUTRAL_TEMPERATURE, NIGHT_TEMPERATURE) if on else (NIGHT_TEMPERATURE, NEUTRAL_TEMPERATURE)
+        for step in range(1, NIGHT_STEPS + 1):
+            part = step / NIGHT_STEPS
+            part = part * part * (3 - 2 * part)   # gentle at both ends
+            run("hyprctl", "hyprsunset", "temperature", str(round(start + (end - start) * part)))
+            time.sleep(0.025)
+        if not on:
+            if self.table >= 100 and not self.timer:
+                run("pkill", "-x", "hyprsunset")
+            else:
+                run("hyprctl", "hyprsunset", "identity")   # still holding the dimming
 
     def send(self, line):
         try:
