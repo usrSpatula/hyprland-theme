@@ -28,6 +28,7 @@
 
 .local/bin/mac-osd
 .local/bin/panel
+.local/bin/sleep-pc
 .local/bin/spotlight-launcher
 .local/bin/ui-sound
 .local/bin/rgb-controller

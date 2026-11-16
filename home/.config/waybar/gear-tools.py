@@ -682,7 +682,7 @@ def build_notes(cc, Gtk, GLib, close):
 POWER_ACTIONS = [
     # (icon, title, command, needs a second click)
     ("lock", "Lock", ["sh", "-c", "pidof hyprlock || hyprlock"], False),
-    ("moon", "Sleep", ["sh", "-c", "(pidof hyprlock || hyprlock) & sleep 1; systemctl suspend"], False),
+    ("moon", "Sleep", [str(Path.home() / ".local/bin/sleep-pc")], False),
     ("logout", "Log Out", ["hyprctl", "dispatch", "exit"], True),
     ("restart", "Restart", ["systemctl", "reboot"], True),
     ("power", "Shut Down", ["systemctl", "poweroff"], True),

@@ -1,0 +1,20 @@
+#!/bin/sh
+# Sleep, for the Power panel: locks the screen, then suspends the PC.
+# If the PC refuses and comes straight back, this says why instead of leaving you at the lock
+# screen guessing. The usual cause is memory: to sleep, the graphics card's memory has to be
+# copied into normal memory, and with that and the swap both full there is nowhere to put it.
+(pidof hyprlock >/dev/null || hyprlock) &
+sleep 1
+before=$(date +%s)
+systemctl suspend
+sleep 12   # asleep, this waits too; if it runs out with the PC still on, the sleep failed
+
+ended=$(date -d "$(systemctl show systemd-suspend.service -p ExecMainExitTimestamp --value)" +%s 2>/dev/null || echo 0)
+if systemctl is-failed --quiet systemd-suspend.service && [ "$ended" -ge "$before" ]; then
+    if journalctl -b -u systemd-suspend.service --since "@$before" --no-pager 2>/dev/null | grep -q "Cannot allocate memory"; then
+        why="There isn't enough free memory to sleep. Close some games or apps and try again."
+    else
+        why="Something stopped it. Details: journalctl -b -u systemd-suspend"
+    fi
+    notify-send -u critical -a "Power" "The PC couldn't go to sleep" "$why"
+fi
