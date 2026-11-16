@@ -1534,20 +1534,63 @@ def build_tools(cc, Gtk, GLib, close):
 
 
 PANELS = {
-    "--tools": ("local.waybar.Tools", build_tools, 240),
-    "--clipboard": ("local.waybar.Clipboard", build_clipboard, 360),
-    "--screenshots": ("local.waybar.Screenshots", build_screenshots, SHOT_COLUMNS * (SHOT_WIDTH + 14) + 30),
-    "--notes": ("local.waybar.Notes", build_notes, 360),
-    "--wifi": ("local.waybar.Wifi", build_wifi, 320),
-    "--bluetooth": ("local.waybar.Bluetooth", build_bluetooth, 320),
-    "--sound": ("local.waybar.Sound", build_sound, SOUND_WIDTH),
-    "--power": ("local.waybar.Power", build_power, 240),
+    # name: (build, width). The names are what ~/.local/bin/panel is called with
+    "tools": (build_tools, 240),
+    "clips": (clips.build_browser, clips.PANEL_WIDTH),
+    "clipboard": (build_clipboard, 360),
+    "screenshots": (build_screenshots, SHOT_COLUMNS * (SHOT_WIDTH + 14) + 30),
+    "notes": (build_notes, 360),
+    "wifi": (build_wifi, 320),
+    "bluetooth": (build_bluetooth, 320),
+    "sound": (build_sound, SOUND_WIDTH),
+    "power": (build_power, 240),
 }
+CLOSED_BY_TOOLS = ("clips", "clipboard", "screenshots")   # Super+V closes these if one is open
+
+
+def run_all(first=None):
+    """Runs every panel from this one program, which stays alive between openings so a panel
+    opens at once (~/.local/bin/panel asks it by name). They used to be a program each, and
+    eight copies of Python and GTK sat in memory to do what one can."""
+    cc = clips.load_control_center()
+    Gtk, Gio = cc.Gtk, cc.Gio
+    app = Gtk.Application(application_id="local.waybar.Panels", flags=Gio.ApplicationFlags.FLAGS_NONE)
+    closers = {}   # name -> the function that closes it, for the panels that are open
+    waiting = [first] if first else []
+
+    def toggle(name):
+        if name == "tools":
+            for other in CLOSED_BY_TOOLS:
+                if other in closers:
+                    closers[other]()
+                    return
+        if name in closers:
+            closers[name]()
+            return
+        for close_other in list(closers.values()):   # one panel at a time
+            close_other()
+        build, width = PANELS[name]
+        # The Super+V menu is opened from the keyboard, so it appears at the mouse
+        closers[name] = clips.open_panel(app, cc, build, width, clips.BROWSER_CSS + TOOLS_CSS,
+                                         lambda: closers.pop(name, None), at_pointer=name == "tools")
+
+    def startup(_app):
+        for name in PANELS:
+            action = Gio.SimpleAction.new(name, None)
+            action.connect("activate", lambda _action, _parameter, name=name: toggle(name))
+            app.add_action(action)
+
+    def activate(_app):
+        # Started by asking for a panel (it wasn't running yet): that panel opens
+        if waiting:
+            toggle(waiting.pop())
+
+    app.connect("startup", startup)
+    app.connect("activate", activate)
+    app.hold()
+    app.run([sys.argv[0]])
+
 
 if __name__ == "__main__":
-    for flag, (app_id, build, width) in PANELS.items():
-        if flag in sys.argv:
-            # The Super+V menu is opened from the keyboard, so it appears at the mouse
-            clips.run_panel(app_id, build, width, clips.BROWSER_CSS + TOOLS_CSS,
-                            at_pointer=flag == "--tools")
-            break
+    asked = sys.argv[sys.argv.index("--open") + 1] if "--open" in sys.argv[1:-1] else None
+    run_all(asked if asked in PANELS else None)

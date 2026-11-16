@@ -11,6 +11,13 @@ import urllib.parse
 import urllib.request
 from pathlib import Path
 
+RUNTIME_DIR = Path(os.environ.get("XDG_RUNTIME_DIR", "/tmp"))
+
+if __name__ == "__main__":
+    # The extra copies wait here, before GTK is loaded, so a waiting copy costs next to nothing
+    LOCK = (RUNTIME_DIR / "waybar-notch.lock").open("w")
+    fcntl.flock(LOCK, fcntl.LOCK_EX)
+
 import gi
 
 gi.require_version("Gdk", "3.0")
@@ -31,7 +38,6 @@ PULSE_GROW = (26, 7)    # px the closed notch swells by when something happens
 PULSE_SECONDS = 0.75
 HOVER_GROW = (14, 4)    # px the closed notch swells by under the mouse, to show it can be clicked
 MAX_ART_BYTES = 5_000_000
-RUNTIME_DIR = Path(os.environ.get("XDG_RUNTIME_DIR", "/tmp"))
 MUSIC_ICON = ""
 PLAYER = ["playerctl", "-p", "playerctld"]
 PREVIOUS_ICON = ""
@@ -476,8 +482,6 @@ def create_notches():
 
 
 def main():
-    lock = (RUNTIME_DIR / "waybar-notch.lock").open("w")
-    fcntl.flock(lock, fcntl.LOCK_EX)
     # clips.py reads this to make the notch pulse when a clip is saved
     (RUNTIME_DIR / "waybar-notch.pid").write_text(str(os.getpid()))
     GLib.unix_signal_add(GLib.PRIORITY_DEFAULT, signal.SIGUSR1, pulse_notches)

@@ -5,6 +5,7 @@ It pops in under the bar, and its level springs to the new volume with a small b
 mac-osd writes "PERCENT MUTED" to the state file and sends SIGUSR1; this stays running
 in the background between presses so the popup appears at once.
 """
+import fcntl
 import math
 import os
 import signal
@@ -150,6 +151,13 @@ class Osd:
 
 
 def main():
+    # Only one copy runs. Quick key presses can start several before the first has written
+    # its pid, and each extra one would sit in memory for good
+    lock = (RUNTIME / "mac-osd.lock").open("w")
+    try:
+        fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError:
+        return
     provider = Gtk.CssProvider()
     provider.load_from_data(CSS)
     Gtk.StyleContext.add_provider_for_screen(Gdk.Screen.get_default(), provider,
