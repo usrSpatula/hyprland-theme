@@ -4,6 +4,10 @@
  * It reads how black to be from standard input, one number from 0 to 1 per line, and fades
  * there in step with the screen. The sheet is a single stretched pixel, so a fade sends the
  * compositor nothing but a new colour each frame. At 0 the sheets are removed entirely.
+ *
+ * A line starting with "=" jumps straight to that number with no fade, and keeps the sheets in
+ * place even at 0 (invisible), ready to show again on the very next frame. The control center
+ * uses that to hand the dimming over to the screen's colour table once a fade has finished.
  */
 #include <errno.h>
 #include <math.h>
@@ -42,6 +46,7 @@ static struct sheet sheets[MAX_SHEETS];
 static double shown, target;
 static uint32_t last_time;
 static int have_time;
+static int keep;   /* stay in place at 0, after a "=" line */
 
 static void paint(struct sheet *sheet);
 
@@ -131,7 +136,7 @@ static void update(void) {
     for (int i = 0; i < MAX_SHEETS; i++) {
         struct sheet *sheet = &sheets[i];
         if (!sheet->output) continue;
-        if (shown == 0 && target == 0) {
+        if (shown == 0 && target == 0 && !keep) {
             remove_sheet(sheet);
         } else if (!sheet->surface) {
             add_sheet(sheet);
@@ -214,8 +219,10 @@ int main(void) {
             line[used] = 0;
             char *end;
             while ((end = strchr(line, '\n'))) {
-                double value = atof(line);
+                keep = line[0] == '=';
+                double value = atof(line + keep);
                 target = value < 0 ? 0 : value > 0.97 ? 0.97 : value;
+                if (keep) shown = target;
                 used -= end + 1 - line;
                 memmove(line, end + 1, used + 1);
                 update();
@@ -223,6 +230,6 @@ int main(void) {
             if (used >= sizeof line - 1) used = 0;
         }
         /* Faded all the way out: take the sheets down so they cost nothing */
-        if (shown == 0 && target == 0) update();
+        if (shown == 0 && target == 0 && !keep) update();
     }
 }

@@ -168,6 +168,11 @@ def read_desktops():
 
 def open_overview(app, on_closed):
     desktops, active, showing, focused = read_desktops()
+    if focused:
+        # One more box after the real desktops: a plus, which opens the first unused desktop
+        taken = {desktop["id"] for desktop in desktops}
+        fresh = next(number for number in range(1, len(taken) + 2) if number not in taken)
+        desktops.append({"id": fresh, "monitor": focused, "windows": [], "new": True})
     state = {"spots": [], "cards": [], "current": None, "closing": False, "size": None}
     # Everything that moves has a number that chases a target a little each frame:
     #   lift[key]   how far a desktop or window has come forward (0 at rest, 1 under the mouse);
@@ -506,7 +511,7 @@ def open_overview(app, on_closed):
         a window's live picture changes, just that window's patch is painted over."""
         desktop = card["desktop"]
         spots = windows_of(desktop)
-        key = (card["x"], card["y"], card["w"], len(spots))
+        key = (card["x"], card["y"], card["w"], len(spots), desktop.get("new"))
         kept = stills.get(desktop["id"])
         was, motion["ticking"] = motion["ticking"], False   # kept pictures are drawn carefully
         if not kept or kept[0] != key:
@@ -516,7 +521,22 @@ def open_overview(app, on_closed):
             pen.save()
             rounded(pen, card["x"], card["y"], card["w"], card["h"], CARD_RADIUS)
             pen.clip()
-            card_wallpaper(pen, card)
+            if desktop.get("new"):
+                # The "new desktop" box: plain glass with a plus in the middle
+                pen.set_source_rgba(1, 1, 1, 0.08)
+                pen.paint()
+                arm = card["h"] * 0.11
+                middle_x, middle_y = card["x"] + card["w"] / 2, card["y"] + card["h"] / 2
+                pen.set_source_rgba(1, 1, 1, 0.85)
+                pen.set_line_width(max(3, card["h"] * 0.022))
+                pen.set_line_cap(cairo.LINE_CAP_ROUND)
+                pen.move_to(middle_x - arm, middle_y)
+                pen.line_to(middle_x + arm, middle_y)
+                pen.move_to(middle_x, middle_y - arm)
+                pen.line_to(middle_x, middle_y + arm)
+                pen.stroke()
+            else:
+                card_wallpaper(pen, card)
             for spot in spots:
                 draw_window(pen, spot, 0.0)
             pen.restore()
@@ -626,10 +646,10 @@ def open_overview(app, on_closed):
             cr.fill()
 
         here = desktop["id"] in active
-        name = f"Desktop {desktop['id']}"
+        name = "New desktop" if desktop.get("new") else f"Desktop {desktop['id']}"
         if current is not None and current["desktop"] == desktop["id"] and "window" in current:
             name += f"   ·   {current['window']['title'] or current['window']['class']}"
-        elif not desktop["windows"]:
+        elif not desktop["windows"] and not desktop.get("new"):
             name += "   ·   empty"
         text(cr, name, card["x"], card["y"] + card["h"] + 12, card["w"], 14, 600,
              0.6 + 0.4 * max(held, 1.0 * here))
@@ -659,9 +679,6 @@ def open_overview(app, on_closed):
                     and card["y"] - REDRAW_MARGIN < bottom
                     and card["y"] + card["h"] + REDRAW_MARGIN + LABEL_HEIGHT > top):
                 draw_card(cr, card, focus)
-        if bottom > height - 40:
-            text(cr, "Click a window to go to it   ·   arrows and Enter work too   ·   Esc closes",
-                 0, height - 34, width, 12, 500, 0.5)
         return True
 
     # ---- Mouse and keyboard ----

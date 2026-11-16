@@ -337,7 +337,9 @@ def set_sounds(on):
         SOUNDS_OFF.touch()
 
 
-# hyprsunset gives Night Shift its warm tint, and only runs while that's on.
+# hyprsunset changes the screen's colour table. It gives Night Shift its warm tint and holds
+# the brightness slider's dimming once a fade has finished (see Dimmer). It only runs while
+# one of them is in use.
 def sunset_running():
     return bool(run("pgrep", "-x", "hyprsunset").strip())
 
@@ -348,25 +350,33 @@ def night_state():
 
 
 def set_night(on):
-    run("pkill", "-x", "hyprsunset")
     if on:
         NIGHT_FLAG.parent.mkdir(parents=True, exist_ok=True)
         NIGHT_FLAG.touch()
-        spawn("hyprsunset", "-t", str(NIGHT_TEMPERATURE))
     else:
         NIGHT_FLAG.unlink(missing_ok=True)
+    dimmer.restart_sunset()
 
 
 class Dimmer:
-    """The bottom of the brightness slider: a see-through black sheet over every monitor,
-    drawn by the small screen-dimmer program (source in ~/.local/share/screen-dimmer), which
-    fades it in step with the screen. Changing the screen's colour table instead (what
-    hyprsunset does) holds up every frame while it changes."""
+    """The bottom of the brightness slider, which darkens the picture itself. Two things can
+    do that, and each is used for what it's good at:
+
+    While the slider moves, a see-through black sheet over every monitor, drawn by the small
+    screen-dimmer program (source in ~/.local/share/screen-dimmer). It fades in step with the
+    screen and costs nothing, but the mouse pointer is drawn above it and stays bright.
+
+    Once the slider has been still for a moment, the screen's colour table (hyprsunset), which
+    darkens the pointer too. Changing it holds up every frame for a moment, so it's changed
+    once, at the end, and the sheet is taken away in the same instant."""
 
     PROGRAM = Path.home() / ".local/bin/screen-dimmer"
+    SETTLE_MS = 700   # the sheet's fade takes about half a second
 
     def __init__(self):
         self.process = None
+        self.table = None   # % of the picture the colour table leaves; None until it's looked up
+        self.timer = 0
 
     @staticmethod
     def saved():
@@ -376,17 +386,71 @@ class Dimmer:
         except (OSError, ValueError):
             return 100
 
-    def set(self, picture):
-        DIM_FILE.parent.mkdir(parents=True, exist_ok=True)
-        DIM_FILE.write_text(str(picture))
+    def look_up(self):
+        if self.table is None:
+            try:
+                self.table = round(float(run("hyprctl", "hyprsunset", "gamma"))) if sunset_running() else 100
+            except ValueError:
+                self.table = 100
+
+    def restart_sunset(self):
+        """(Re)starts hyprsunset for Night Shift and the colour table's dimming as they are
+        now, or stops it if neither is in use."""
+        self.look_up()
+        run("pkill", "-x", "hyprsunset")
+        night = NIGHT_FLAG.exists()
+        if not night and self.table >= 100 and not self.timer:
+            return
+        for _ in range(20):   # the old one has to let go of the screen first
+            if not sunset_running():
+                break
+            time.sleep(0.02)
+        spawn("hyprsunset", *(["-t", str(NIGHT_TEMPERATURE)] if night else ["-i"]), "-g", str(self.table))
+
+    def send(self, line):
         try:
             if not self.process or self.process.poll() is not None:
                 self.process = subprocess.Popen([str(self.PROGRAM)], stdin=subprocess.PIPE,
                                                 stderr=subprocess.DEVNULL)
-            self.process.stdin.write(f"{1 - picture / 100:.3f}\n".encode())
+            self.process.stdin.write(f"{line}\n".encode())
             self.process.stdin.flush()
+            return True
         except OSError:
-            self.process = None   # not built on this machine, so the slider stops at the backlight
+            self.process = None   # not built on this machine
+            return False
+
+    def set(self, picture):
+        DIM_FILE.parent.mkdir(parents=True, exist_ok=True)
+        DIM_FILE.write_text(str(picture))
+        self.look_up()
+        if self.timer:
+            GLib.source_remove(self.timer)
+        elif self.table < 100:
+            # The colour table has the dimming: the sheet takes it back, so it can fade
+            if self.send(f"={1 - self.table / 100:.3f}"):
+                run("hyprctl", "hyprsunset", "gamma", "100")
+                self.table = 100
+        elif picture < 100 and not sunset_running():
+            self.timer = -1   # so restart_sunset knows it's about to be needed
+            self.restart_sunset()   # ready and waiting by the time the fade ends
+        if self.send(f"{1 - picture / 100:.3f}"):
+            self.timer = GLib.timeout_add(self.SETTLE_MS, self.settle, picture)
+        else:
+            # No sheet to fade with, so the colour table does it all, in one step
+            self.timer = 0
+            self.table = picture
+            self.restart_sunset()
+        return False
+
+    def settle(self, picture):
+        """The fade is over: the colour table takes the dimming, and the sheet goes."""
+        self.timer = 0
+        if picture < 100:
+            if "ok" in run("hyprctl", "hyprsunset", "gamma", str(picture)):
+                self.send("=0")
+                self.table = picture
+        elif not NIGHT_FLAG.exists():
+            run("pkill", "-x", "hyprsunset")
         return False
 
 

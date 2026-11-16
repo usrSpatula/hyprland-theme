@@ -469,6 +469,10 @@ hl.bind(mainMod .. " + CTRL + S", hl.dsp.window.move({ workspace = "special:magi
 -- Hyprland normally ignores a second scroll for 300 ms; with 0 every notch of the wheel counts,
 -- so two quick notches move two desktops straight away
 hl.config({ binds = { scroll_event_delay = 0 } })
+
+-- Colour table changes (Night Shift, and the dark end of the brightness slider) apply in one
+-- step. Hyprland's own fade for them holds every frame up while it runs
+hl.config({ render = { ctm_animation = 0 } })
 hl.bind(mainMod .. " + mouse_down", hl.dsp.focus({ workspace = "e+1" }))
 hl.bind(mainMod .. " + mouse_up",   hl.dsp.focus({ workspace = "e-1" }))
 
