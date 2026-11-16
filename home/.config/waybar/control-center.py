@@ -44,6 +44,7 @@ BLUE = "#0a84ff"
 # ui-sound stays quiet while this file exists (the Sounds switch)
 NIGHT_FLAG = Path(os.environ.get("XDG_STATE_HOME") or Path.home() / ".local/state") / "night-shift-on"
 DIM_ZONE = 30    # the bottom 30% of the brightness slider darkens the picture, below the backlight's lowest
+DIM_FILE = NIGHT_FLAG.with_name("screen-dim")
 DIM_FLOOR = 10   # % of the picture that's left at the very bottom
 SOUNDS_OFF = Path(os.environ.get("XDG_STATE_HOME") or Path.home() / ".local/state") / "ui-sounds-off"
 
@@ -336,32 +337,9 @@ def set_sounds(on):
         SOUNDS_OFF.touch()
 
 
-# hyprsunset does two jobs: Night Shift's warm tint, and the bottom of the brightness slider,
-# which darkens the picture itself (its "gamma"). It only runs while one of them is in use.
+# hyprsunset gives Night Shift its warm tint, and only runs while that's on.
 def sunset_running():
     return bool(run("pgrep", "-x", "hyprsunset").strip())
-
-
-def sunset_gamma():
-    """How bright the picture is, in percent. 100 is untouched."""
-    try:
-        return round(float(run("hyprctl", "hyprsunset", "gamma"))) if sunset_running() else 100
-    except ValueError:
-        return 100
-
-
-def start_sunset(gamma):
-    """(Re)starts hyprsunset for the current Night Shift setting and this gamma,
-    or stops it if neither is needed."""
-    run("pkill", "-x", "hyprsunset")
-    night = NIGHT_FLAG.exists()
-    if not night and gamma >= 100:
-        return
-    for _ in range(20):   # the old one has to let go of the screen first
-        if not sunset_running():
-            break
-        time.sleep(0.02)
-    spawn("hyprsunset", *(["-t", str(NIGHT_TEMPERATURE)] if night else ["-i"]), "-g", str(gamma))
 
 
 def night_state():
@@ -370,13 +348,49 @@ def night_state():
 
 
 def set_night(on):
-    gamma = sunset_gamma()
+    run("pkill", "-x", "hyprsunset")
     if on:
         NIGHT_FLAG.parent.mkdir(parents=True, exist_ok=True)
         NIGHT_FLAG.touch()
+        spawn("hyprsunset", "-t", str(NIGHT_TEMPERATURE))
     else:
         NIGHT_FLAG.unlink(missing_ok=True)
-    start_sunset(gamma)
+
+
+class Dimmer:
+    """The bottom of the brightness slider: a see-through black sheet over every monitor,
+    drawn by the small screen-dimmer program (source in ~/.local/share/screen-dimmer), which
+    fades it in step with the screen. Changing the screen's colour table instead (what
+    hyprsunset does) holds up every frame while it changes."""
+
+    PROGRAM = Path.home() / ".local/bin/screen-dimmer"
+
+    def __init__(self):
+        self.process = None
+
+    @staticmethod
+    def saved():
+        """The picture level from last time, in percent. 100 is untouched."""
+        try:
+            return min(max(int(DIM_FILE.read_text()), DIM_FLOOR), 100)
+        except (OSError, ValueError):
+            return 100
+
+    def set(self, picture):
+        DIM_FILE.parent.mkdir(parents=True, exist_ok=True)
+        DIM_FILE.write_text(str(picture))
+        try:
+            if not self.process or self.process.poll() is not None:
+                self.process = subprocess.Popen([str(self.PROGRAM)], stdin=subprocess.PIPE,
+                                                stderr=subprocess.DEVNULL)
+            self.process.stdin.write(f"{1 - picture / 100:.3f}\n".encode())
+            self.process.stdin.flush()
+        except OSError:
+            self.process = None   # not built on this machine, so the slider stops at the backlight
+        return False
+
+
+dimmer = Dimmer()
 
 
 class Toggle:
@@ -440,7 +454,7 @@ class Brightness:
 
     A monitor's lowest backlight is still quite bright, so the slider goes further: from
     DIM_ZONE up it moves the backlight across its whole range, and below that the backlight
-    stays at its lowest while the picture itself is darkened (see start_sunset)."""
+    stays at its lowest while the picture itself is darkened (see Dimmer)."""
 
     STEP_SECONDS = 0.045   # monitors drop commands that arrive much faster than this
 
@@ -448,7 +462,7 @@ class Brightness:
         self.buses = []
         self.target = None   # (backlight, gamma) the slider asks for
         self.sent = None     # the backlight value the monitors have
-        self.gamma = 100
+        self.gamma = Dimmer.saved()   # % of the picture left by the Dimmer
         self.direct = True
         self.busy = False
         self.lock = threading.Lock()
@@ -461,7 +475,6 @@ class Brightness:
         parts = run("ddcutil", "--bus", self.buses[0], "getvcp", "10", "--brief").split()
         if len(parts) >= 5 and parts[3].isdigit() and parts[4].isdigit():
             self.sent = int(parts[3])
-            self.gamma = sunset_gamma()
             backlight = 100 * int(parts[3]) / max(int(parts[4]), 1)
             if backlight > 0 or self.gamma >= 100:
                 GLib.idle_add(on_read, DIM_ZONE + backlight * (100 - DIM_ZONE) / 100)
@@ -507,14 +520,6 @@ class Brightness:
         for process in processes:
             process.wait()
 
-    def write_gamma(self, value):
-        if sunset_running():
-            run("hyprctl", "hyprsunset", "gamma", str(value))
-            if value >= 100 and not NIGHT_FLAG.exists():
-                run("pkill", "-x", "hyprsunset")
-        elif value < 100:
-            start_sunset(value)
-
     @staticmethod
     def toward(now, target):
         # A quarter of the way there each step, and never less than 1
@@ -533,8 +538,8 @@ class Brightness:
                 self.sent = self.toward(self.sent, backlight) if smooth else backlight
                 self.write(self.sent)
             if self.gamma != gamma:
-                self.gamma = self.toward(self.gamma, gamma)
-                self.write_gamma(self.gamma)
+                self.gamma = gamma
+                GLib.idle_add(dimmer.set, gamma)   # the Dimmer does its own fading
             time.sleep(self.STEP_SECONDS)
 
 
@@ -1128,6 +1133,8 @@ def run_resident(app_id, open_panel):
 
 
 def main():
+    if Dimmer.saved() < 100:
+        GLib.idle_add(dimmer.set, Dimmer.saved())   # still dimmed from last time
     run_resident("local.waybar.ControlCenter", open_window)
 
 

@@ -31,4 +31,6 @@
 .local/bin/spotlight-launcher
 .local/bin/ui-sound
 .local/bin/rgb-controller
+# Source for screen-dimmer; install.sh builds it into ~/.local/bin
+.local/share/screen-dimmer/
 .local/share/applications/rgb-controller.desktop

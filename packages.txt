@@ -66,3 +66,7 @@ gst-plugin-pipewire
 # RGB Controller talks to the lights through OpenRGB
 openrgb
 hyprlock
+
+# To build screen-dimmer, the brightness slider's dimming layer
+gcc
+wayland-protocols

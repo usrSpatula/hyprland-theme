@@ -616,6 +616,14 @@ pcall(function()
         animation = "slide right",
     })
 end)
+-- The brightness slider's dimming sheet appears and goes without any animation of its own
+pcall(function()
+    hl.layer_rule({
+        name    = "dimmer-plain",
+        match   = { namespace = "^dimmer$" },
+        no_anim = true,
+    })
+end)
 pcall(function()
     hl.layer_rule({
         name         = "wofi-glass",

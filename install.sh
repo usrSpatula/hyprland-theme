@@ -105,6 +105,14 @@ if [[ -e $HOME/.config/hypr/hyprland.conf ]]; then
 fi
 
 
+# ---- Build ----
+
+# The brightness slider's dimming layer is a small C program
+if ! "$HOME/.local/share/screen-dimmer/build.sh" 2>/dev/null; then
+    note "Couldn't build screen-dimmer, so the brightness slider won't go darker than the backlight's lowest."
+fi
+
+
 # ---- Looks ----
 
 # The panels are GTK windows: dark, Breeze, in Inter
