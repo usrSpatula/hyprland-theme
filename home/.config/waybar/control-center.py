@@ -136,14 +136,11 @@ scrolledwindow undershoot, scrolledwindow overshoot { background: none; border: 
 .rise-14 { animation-delay: 532ms; }
 
 
-/* A switch that turns on swells for a moment and sends out a ring */
+/* A switch that turns on sends out a ring. It doesn't change size: growing it pushed the
+   whole panel wider and taller for a moment */
 @keyframes pop {
-    0%   { margin: 0;    min-width: 30px; min-height: 30px; border-radius: 15px;
-           box-shadow: 0 0 0 0 rgba(10, 132, 255, 0.75); }
-    35%  { margin: -4px; min-width: 38px; min-height: 38px; border-radius: 19px; }
-    60%  { margin: 1px;  min-width: 28px; min-height: 28px; border-radius: 14px; }
-    100% { margin: 0;    min-width: 30px; min-height: 30px; border-radius: 15px;
-           box-shadow: 0 0 0 14px rgba(10, 132, 255, 0); }
+    0%   { box-shadow: 0 0 0 0 rgba(10, 132, 255, 0.75); }
+    100% { box-shadow: 0 0 0 14px rgba(10, 132, 255, 0); }
 }
 .circle.popping { animation: pop 460ms ease-out; }
 .toggle.hover { background-color: rgba(255, 255, 255, 0.12); box-shadow: 0 4px 12px rgba(0, 0, 0, 0.28); }
@@ -247,7 +244,7 @@ def press_feedback(area, target):
 
 
 def pop(widget):
-    """Plays the "pop" animation on a round button: it swells and sends out a ring."""
+    """Plays the "pop" animation on a round button: it sends out a ring."""
     set_class(widget, "popping", False)
     set_class(widget, "popping", True)
     GLib.timeout_add(500, lambda: set_class(widget, "popping", False) and False)
