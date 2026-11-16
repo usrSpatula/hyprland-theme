@@ -65,3 +65,4 @@ gst-plugin-pipewire
 
 # RGB Controller talks to the lights through OpenRGB
 openrgb
+hyprlock

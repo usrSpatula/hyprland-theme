@@ -8,6 +8,7 @@
 
     "modules-left": [
         "custom/apple",
+        "hyprland/workspaces",
         "hyprland/window",
         "group/learning"
     ],
@@ -23,6 +24,14 @@
     "custom/apple": {
         "format": " ",
         "tooltip": false
+    },
+
+    // One dot per desktop that has windows; the one you're on stretches into a pill.
+    // Click a dot to go there
+    "hyprland/workspaces": {
+        "format": " ",
+        "on-click": "activate",
+        "sort-by": "number"
     },
 
     // App name in bold, like macOS (shows the focused app's class)

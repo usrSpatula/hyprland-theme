@@ -211,3 +211,43 @@ tooltip label {
 #network                   { animation: state-a 520ms ease-out; }
 #network.disconnected      { animation: state-b 520ms ease-out; }
 #network.ethernet          { animation: state-c 520ms ease-out; }
+
+/* Desktop dots: a small dot per desktop, and a wider pill for the one you're on.
+   The width change overshoots a little, so the pill stretches and settles as you switch */
+#workspaces {
+    padding: 0 8px 0 2px;
+    margin: 0;
+}
+
+#workspaces button {
+    font-size: 1px;
+    min-width: 6px;
+    min-height: 6px;
+    padding: 0;
+    margin: 11px 3px;
+    border-radius: 3px;
+    background-color: rgba(255, 255, 255, 0.38);
+    transition: min-width 320ms cubic-bezier(0.34, 1.56, 0.64, 1),
+                background-color 200ms ease-out;
+}
+
+#workspaces button label {
+    font-size: 1px;
+    padding: 0;
+    margin: 0;
+    min-width: 0;
+}
+
+#workspaces button:hover {
+    background-color: rgba(255, 255, 255, 0.7);
+}
+
+#workspaces button.active,
+#workspaces button.visible {
+    min-width: 18px;
+    background-color: rgba(255, 255, 255, 0.96);
+}
+
+#workspaces button.urgent {
+    background-color: rgba(255, 105, 97, 0.95);
+}

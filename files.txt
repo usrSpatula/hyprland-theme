@@ -2,6 +2,7 @@
 # A line ending in / is a whole folder. install.sh and collect.sh both read this list.
 
 .config/hypr/hyprland.lua
+.config/hypr/hyprlock.conf
 .config/hypr/screenshot.sh
 .config/hypr/share-picker.sh
 .config/hypr/screenshot-flash.py
