@@ -32,6 +32,24 @@ app() {
     fi
 }
 
+# Super+V: if the clips, clipboard or screenshots panel is open, the key closes it instead of
+# opening the menu. A panel is open when its program has a layer on the screen.
+if [ "$1" = tools ]; then
+    showing=$(hyprctl layers | sed -n 's/.*namespace: control-center, pid: \([0-9]*\).*/\1/p')
+    for name in clips clipboard screenshots; do
+        case "$name" in
+            clips)       id=local.waybar.Clips ;;
+            clipboard)   id=local.waybar.Clipboard ;;
+            screenshots) id=local.waybar.Screenshots ;;
+        esac
+        pid=$(busctl --user status "$id" 2>/dev/null | sed -n 's/^PID=//p')
+        if [ -n "$pid" ] && echo "$showing" | grep -qx "$pid"; then
+            app "$name"   # it's open, so this closes it
+            exit 0
+        fi
+    done
+fi
+
 if [ "$1" = --warm ]; then
     standby=1
     for name in control-center clips clipboard screenshots wifi bluetooth sound power tools overview; do

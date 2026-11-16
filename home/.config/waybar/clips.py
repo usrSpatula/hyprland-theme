@@ -920,8 +920,24 @@ def panel_left_edge(width=PANEL_WIDTH):
     return max(12, x - width // 2)
 
 
-def open_panel(app, cc, build, width, extra_css, on_closed=lambda: None):
-    """Opens a glass panel under the click. build(cc, Gtk, GLib, close) returns
+def pointer_spot(width, height):
+    """Where a panel of this size goes to sit just beside the mouse, kept on its monitor.
+    Returns (left, top) from that monitor's corner."""
+    try:
+        x, y = map(int, run("hyprctl", "cursorpos").split(","))
+    except ValueError:
+        return 12, 40
+    for monitor in hyprctl_json("monitors") or []:
+        if (monitor["x"] <= x < monitor["x"] + monitor["width"]
+                and monitor["y"] <= y < monitor["y"] + monitor["height"]):
+            x = min(x - monitor["x"] + 8, monitor["width"] - width - 12)
+            y = min(y - monitor["y"] + 8, monitor["height"] - height - 12)
+    return max(12, x), max(12, y)
+
+
+def open_panel(app, cc, build, width, extra_css, on_closed=lambda: None, at_pointer=False):
+    """Opens a glass panel under the click, or right beside the mouse with at_pointer (for
+    one opened from the keyboard). build(cc, Gtk, GLib, close) returns
     (panel, timers, cleanup). Also used by gear-tools.py."""
     from gi.repository import Gdk, GLib, Gtk, GtkLayerShell
 
@@ -965,7 +981,12 @@ def open_panel(app, cc, build, width, extra_css, on_closed=lambda: None):
     panel_area.set_visible_window(False)
     panel_area.add(panel)
     panel_area.connect("button-press-event", lambda *_: True)
-    left = panel_left_edge(width)
+    if at_pointer:
+        panel.show_all()
+        left, top = pointer_spot(width, panel.get_preferred_height()[1] + cc.SHADOW_ROOM + 10)
+        top = max(top - 6, 0)   # panel_area's own margin below adds the 6 back
+    else:
+        left, top = panel_left_edge(width), cc.BAR_HEIGHT
     panel_area.set_margin_start(min(left, cc.SHADOW_ROOM))
     panel_area.set_margin_end(cc.SHADOW_ROOM)
     panel_area.set_margin_top(6)
@@ -975,7 +996,7 @@ def open_panel(app, cc, build, width, extra_css, on_closed=lambda: None):
     revealer.set_halign(Gtk.Align.START)
     revealer.set_valign(Gtk.Align.START)
     revealer.set_margin_start(max(left - cc.SHADOW_ROOM, 0))
-    revealer.set_margin_top(cc.BAR_HEIGHT)
+    revealer.set_margin_top(top)
     revealer.add(panel_area)
 
     window.add(revealer)
@@ -990,10 +1011,11 @@ def open_panel(app, cc, build, width, extra_css, on_closed=lambda: None):
     return close
 
 
-def run_panel(app_id, build, width, extra_css):
+def run_panel(app_id, build, width, extra_css, at_pointer=False):
     cc = load_control_center()
     # Stays running between openings (see run_resident in control-center.py)
-    cc.run_resident(app_id, lambda app, on_closed: open_panel(app, cc, build, width, extra_css, on_closed))
+    cc.run_resident(app_id, lambda app, on_closed: open_panel(app, cc, build, width, extra_css, on_closed,
+                                                              at_pointer))
 
 
 def browser():

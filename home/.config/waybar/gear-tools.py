@@ -1547,5 +1547,7 @@ PANELS = {
 if __name__ == "__main__":
     for flag, (app_id, build, width) in PANELS.items():
         if flag in sys.argv:
-            clips.run_panel(app_id, build, width, clips.BROWSER_CSS + TOOLS_CSS)
+            # The Super+V menu is opened from the keyboard, so it appears at the mouse
+            clips.run_panel(app_id, build, width, clips.BROWSER_CSS + TOOLS_CSS,
+                            at_pointer=flag == "--tools")
             break
