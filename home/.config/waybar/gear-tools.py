@@ -53,7 +53,7 @@ ICONS = {
     "wifi": "\uf1eb", "rescan": "\uf021", "eye": "\uf06e", "settings": "\uf013",
     "bluetooth": "\uf294", "headphones": "\uf025", "speaker": "\uf028", "keyboard": "\uf11c",
     "mouse": "\uf8cc", "gamepad": "\uf11b", "phone": "\uf3cd", "laptop": "\uf109",
-    "bell": "\uf0f3", "xmark": "\uf00d",
+    "bell": "\uf0f3", "xmark": "\uf00d", "film": "\uf008",
 }
 
 TOOLS_CSS = b"""
@@ -686,6 +686,14 @@ POWER_ACTIONS = [
     ("logout", "Log Out", ["hyprctl", "dispatch", "exit"], True),
     ("restart", "Restart", ["systemctl", "reboot"], True),
     ("power", "Shut Down", ["systemctl", "poweroff"], True),
+]
+
+
+# What Super+V offers: each opens its own panel
+TOOLS = [
+    ("film", "Clips", "clips"),
+    ("clipboard", "Clipboard", "clipboard"),
+    ("images", "Screenshots", "screenshots"),
 ]
 
 
@@ -1504,7 +1512,29 @@ def build_power(cc, Gtk, GLib, close):
     return panel, [], lambda: None
 
 
+def build_tools(cc, Gtk, GLib, close):
+    """Super+V: a short menu of the clips, clipboard and screenshots panels."""
+    parts = Parts(cc, Gtk, GLib)
+    panel = parts.panel(240)
+    for icon, title, name in TOOLS:
+        row = cc.css_classes(Gtk.Box(spacing=10), "tile", "power-row")
+        circle = cc.icon_label(icon, "power-circle")
+        circle.set_valign(Gtk.Align.CENTER)
+        row.pack_start(circle, False, False, 0)
+        label = parts.label(title, "tile-title")
+        label.set_valign(Gtk.Align.CENTER)
+        row.pack_start(label, True, True, 0)
+
+        def act(name=name):
+            close()
+            spawn(str(Path.home() / ".local/bin/panel"), name)
+
+        panel.pack_start(parts.hover_row(row, "power-row", act), False, False, 0)
+    return panel, [], lambda: None
+
+
 PANELS = {
+    "--tools": ("local.waybar.Tools", build_tools, 240),
     "--clipboard": ("local.waybar.Clipboard", build_clipboard, 360),
     "--screenshots": ("local.waybar.Screenshots", build_screenshots, SHOT_COLUMNS * (SHOT_WIDTH + 14) + 30),
     "--notes": ("local.waybar.Notes", build_notes, 360),

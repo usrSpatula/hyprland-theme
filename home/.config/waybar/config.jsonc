@@ -9,7 +9,7 @@
     "modules-left": [
         "custom/apple",
         "hyprland/workspaces",
-        "group/learning"
+        "custom/power"
     ],
     "modules-center": ["custom/notch"],
     "modules-right": [
@@ -91,35 +91,6 @@
         }
     },
 
-    // Gear: click it to slide out the clips and gear-tools buttons (icons only), click again to hide them
-    "group/learning": {
-        "orientation": "horizontal",
-        "drawer": {
-            "click-to-reveal": true,
-            "transition-duration": 300,
-            "children-class": "learning-drawer",
-            "transition-left-to-right": true
-        },
-        "modules": [
-            "custom/gear",
-            "custom/clips",
-            "custom/clipboard",
-            "custom/screenshots",
-            "custom/power"
-        ]
-    },
-
-    // Gear tools (see gear-tools.py): clipboard history, screenshots, power menu
-    "custom/clipboard": {
-        "format": " ",
-        "tooltip": false,
-        "on-click": "$HOME/.local/bin/panel clipboard"
-    },
-    "custom/screenshots": {
-        "format": " ",
-        "tooltip": false,
-        "on-click": "$HOME/.local/bin/panel screenshots"
-    },
     "custom/power": {
         "format": " ",
         "tooltip": false,
@@ -128,15 +99,6 @@
 
     // Clips (see clips.py): the film opens the clips panel, with the recording on/off switch
     // (Super+Insert) at the top and every clip below, newest first. Insert saves the last 30 seconds
-    "custom/clips": {
-        "format": " ",
-        "tooltip": false,
-        "on-click": "$HOME/.local/bin/panel clips"
-    },
-    "custom/gear": {
-        "format": " ",
-        "tooltip": false
-    },
 
     // Starts the black notch, which draws itself in its own window (see notch.py)
     "custom/notch": {
