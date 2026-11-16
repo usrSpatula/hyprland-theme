@@ -921,7 +921,7 @@ def panel_left_edge(width=PANEL_WIDTH):
 
 
 def pointer_spot(width, height):
-    """Where a panel of this size goes to sit just beside the mouse, kept on its monitor.
+    """Where a panel of this size goes to have its top left corner at the mouse, kept on its monitor.
     Returns (left, top) from that monitor's corner."""
     try:
         x, y = map(int, run("hyprctl", "cursorpos").split(","))
@@ -930,9 +930,9 @@ def pointer_spot(width, height):
     for monitor in hyprctl_json("monitors") or []:
         if (monitor["x"] <= x < monitor["x"] + monitor["width"]
                 and monitor["y"] <= y < monitor["y"] + monitor["height"]):
-            x = min(x - monitor["x"] + 8, monitor["width"] - width - 12)
-            y = min(y - monitor["y"] + 8, monitor["height"] - height - 12)
-    return max(12, x), max(12, y)
+            x = min(x - monitor["x"], monitor["width"] - width - 12)
+            y = min(y - monitor["y"], monitor["height"] - height - 12)
+    return max(0, x), max(0, y)
 
 
 def open_panel(app, cc, build, width, extra_css, on_closed=lambda: None, at_pointer=False):
@@ -1005,7 +1005,7 @@ def open_panel(app, cc, build, width, extra_css, on_closed=lambda: None, at_poin
     # Esc cancels an edit first (like a rename), then closes the panel
     window.connect("key-press-event", lambda _w, e: e.keyval == Gdk.KEY_Escape
                    and not getattr(panel, "cancel_edit", lambda: False)() and close())
-    window.connect("map-event", lambda *_: cc.drop_in(revealer))
+    window.connect("map-event", lambda *_: cc.drop_in(revealer, top))
     window.connect("destroy", lambda *_: on_closed())
     window.show_all()
     return close

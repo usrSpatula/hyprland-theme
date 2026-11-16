@@ -1116,10 +1116,11 @@ def open_window(app, on_closed):
 
 
 
-def drop_in(revealer):
+def drop_in(revealer, rest=BAR_HEIGHT):
     """Opens a panel. It's first laid out and drawn unseen for a couple of frames, because a big
     panel (like 100 screenshots) takes long enough to build that it would eat the animation and
-    just snap into place. Then it slides, fades and bounces in."""
+    just snap into place. Then it slides, fades and bounces in. rest is how far down the
+    screen it comes to rest: just under the bar, unless it was opened somewhere else."""
     revealer.set_opacity(0)
     revealer.set_transition_duration(0)
     revealer.set_reveal_child(True)
@@ -1132,7 +1133,7 @@ def drop_in(revealer):
         revealer.set_reveal_child(False)
         revealer.set_transition_duration(OPEN_DURATION)
         revealer.set_reveal_child(True)
-        spring_in(revealer, BAR_HEIGHT)
+        spring_in(revealer, rest)
         cascade(revealer)
         sound("open")
         return False
