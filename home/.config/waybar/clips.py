@@ -1156,6 +1156,10 @@ def build_browser(cc, Gtk, GLib, close):
                 cc.set_class(column, "hover", inside)
 
         def on_click(_area, event):
+            # Only a click on the clip itself plays it: one that landed on a button, or on the
+            # shrink strip, belongs to that and is left alone
+            if Gtk.get_event_widget(event) not in (area, thumb_box):
+                return True
             if event.button == 1 and not editing["cancel"]:
                 stop_preview(entry)
                 play(entry["path"], entry["title"])
