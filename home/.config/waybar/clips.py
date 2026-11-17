@@ -36,7 +36,7 @@ LOG = RUNTIME / "recorder.log"
 # Tells ~/.config/hypr/share-picker.sh which monitor the next portal request is for
 PORTAL_REQUEST = RUNTIME / "portal-request"
 PORTAL_ANSWER_SECONDS = 4
-# The clip length you picked in the panel
+# What you picked in the panel: clip length, quality, and how much is kept ready
 SETTINGS = Path.home() / ".config" / "clips" / "settings.json"
 
 RECORDER = "gpu-screen-recorder"
@@ -50,7 +50,12 @@ DEFAULT_SECONDS = 30
 # minute on the desktop, up to ~100 MB a minute in a busy game.
 SAVE_SIGNALS = {10: 1, 30: 2, 60: 3, 300: 4}   # seconds -> SIGRTMIN + n
 LENGTHS = tuple(SAVE_SIGNALS)
-BUFFER_SECONDS = max(LENGTHS)
+# How much the recorder keeps ready, and how good the picture is. Both decide how much memory
+# the buffer takes; changing either restarts the recorder, which empties the buffer.
+BUFFERS = (60, 300)
+DEFAULT_BUFFER = max(BUFFERS)
+QUALITIES = {"medium": "Medium", "high": "High", "very_high": "Best"}   # gpu-screen-recorder's -q
+DEFAULT_QUALITY = "very_high"
 FPS = 60
 RESTART_SECONDS = 3
 STAMP = "%Y-%m-%d %H-%M-%S"
@@ -120,13 +125,30 @@ def shown_window(monitor):
     return windows[0] if windows else None
 
 
-def clip_seconds():
-    """How long a saved clip is, as picked in the panel."""
+def read_settings():
     try:
-        seconds = int(json.loads(SETTINGS.read_text())["seconds"])
-    except (OSError, ValueError, KeyError, TypeError):
-        return DEFAULT_SECONDS
-    return seconds if seconds in LENGTHS else DEFAULT_SECONDS
+        settings = json.loads(SETTINGS.read_text())
+    except (OSError, ValueError):
+        return {}
+    return settings if isinstance(settings, dict) else {}
+
+
+def buffer_seconds():
+    """How far back the recorder keeps, as picked in the panel."""
+    seconds = read_settings().get("buffer")
+    return seconds if seconds in BUFFERS else DEFAULT_BUFFER
+
+
+def clip_quality():
+    quality = read_settings().get("quality")
+    return quality if quality in QUALITIES else DEFAULT_QUALITY
+
+
+def clip_seconds():
+    """How long a saved clip is, as picked in the panel. Never longer than what's kept."""
+    seconds = read_settings().get("seconds")
+    seconds = seconds if seconds in LENGTHS else DEFAULT_SECONDS
+    return min(seconds, buffer_seconds())
 
 
 def length_name(seconds):
@@ -190,8 +212,8 @@ class Recorders:
         # encodes when the screen actually changes. The monitor comes from share-picker.sh.
         # Sound: everything you hear (games, and Discord, which plays through the same device)
         # mixed with your microphone, so your own voice is in the clip too
-        return [RECORDER, "-w", "portal", "-fm", "content", "-f", str(FPS), "-r", str(BUFFER_SECONDS),
-                "-c", "mp4", "-k", "h264", "-ac", "aac", "-q", "very_high",
+        return [RECORDER, "-w", "portal", "-fm", "content", "-f", str(FPS), "-r", str(buffer_seconds()),
+                "-c", "mp4", "-k", "h264", "-ac", "aac", "-q", clip_quality(),
                 "-a", "default_output|default_input",
                 "-v", "no", "-o", str(INCOMING)]
 
@@ -255,6 +277,11 @@ class Recorders:
         with self.lock:
             self.waiting[monitor] = (label, seconds, datetime.datetime.now())
         process.send_signal(signal.SIGRTMIN + SAVE_SIGNALS[seconds])
+
+    def restart(self):
+        """Stops the buffers; keep_running starts them again with the settings as they are now."""
+        self.stop()
+        self.running.clear()
 
     def toggle(self):
         self.enabled = not self.enabled
@@ -322,13 +349,17 @@ def daemon():
     requests = []
     signal.signal(signal.SIGUSR1, lambda *_: requests.append("save"))
     signal.signal(signal.SIGUSR2, lambda *_: requests.append("toggle"))
+    signal.signal(signal.SIGHUP, lambda *_: requests.append("restart"))   # settings changed
     signal.signal(signal.SIGTERM, lambda *_: (recorders.stop(), sys.exit(0)))
 
     while True:
         recorders.keep_running()
         while requests:
-            if requests.pop(0) == "toggle":
+            request = requests.pop(0)
+            if request == "toggle":
                 recorders.toggle()
+            elif request == "restart":
+                recorders.restart()
             else:
                 recorders.save()
         recorders.write_status()
@@ -359,10 +390,22 @@ def toggle():
     notify("Clip recording on", f"Insert saves the last {length_name(clip_seconds())}.")
 
 
+def write_setting(key, value):
+    SETTINGS.parent.mkdir(parents=True, exist_ok=True)
+    SETTINGS.write_text(json.dumps({**read_settings(), key: value}))
+
+
 def set_length(seconds):
     # Read at each save, so it takes effect straight away
-    SETTINGS.parent.mkdir(parents=True, exist_ok=True)
-    SETTINGS.write_text(json.dumps({"seconds": seconds}))
+    write_setting("seconds", seconds)
+
+
+def set_recorder(key, value):
+    """Changes the quality or how much is kept, and has the recorder start again with it."""
+    write_setting(key, value)
+    pid = daemon_pid()
+    if pid:
+        os.kill(pid, signal.SIGHUP)
 
 
 def read_status():
@@ -439,6 +482,7 @@ button.pill {
 }
 button.pill:hover { background-color: rgba(255, 255, 255, 0.15); }
 button.pill.selected, button.pill.selected:hover { background-color: #0a84ff; }
+button.pill:disabled { opacity: 0.35; }
 scrolledwindow, viewport { background-color: transparent; border: none; }
 scrollbar { background-color: transparent; border: none; }
 scrollbar slider {
@@ -495,6 +539,7 @@ def build_browser(cc, Gtk, GLib, close):
     from gi.repository import Gdk, GdkPixbuf, Pango
 
     cc.ICONS.update({"film": FILM_ICON, "folder": "", "trash": "", "clip": CLIP_ICON, "length": "\uf2f2",
+                     "quality": "\uf1de", "memory": "\uf538",
                      "pencil": "\uf303", "copy": "\uf0c5", "check": "\uf00c"})
     panel = cc.css_classes(Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8), "panel")
     panel.set_size_request(PANEL_WIDTH, -1)
@@ -546,26 +591,59 @@ def build_browser(cc, Gtk, GLib, close):
         switch.refresh()
         panel.pack_start(recording, False, False, 0)
 
-        # Clip length: how far back Insert reaches
-        length = cc.css_classes(Gtk.Box(spacing=9), "tile")
-        length.pack_start(cc.icon_label("length", "length-icon"), False, False, 0)
-        length.pack_start(label("Clip Length", "tile-title"), True, True, 0)
-        pills = []
-        for seconds in LENGTHS:
-            pill = cc.css_classes(Gtk.Button(label=f"{seconds}s" if seconds < 60 else f"{seconds // 60}m"), "pill")
-            pill.set_valign(Gtk.Align.CENTER)
-            pill.set_tooltip_text(f"Save the last {length_name(seconds)}")
-            cc.set_class(pill, "selected", seconds == clip_seconds())
-            pills.append(pill)
+        def pill_row(icon, title, options, current, choose):
+            """A tile with a title and a row of choices, one of them lit. options is
+            [(value, short label, tooltip)]; choose(value) is called on a new pick."""
+            row = cc.css_classes(Gtk.Box(spacing=9), "tile")
+            row.pack_start(cc.icon_label(icon, "length-icon"), False, False, 0)
+            row.pack_start(label(title, "tile-title"), True, True, 0)
+            pills = {}
 
-            def choose(_button, seconds=seconds, chosen=pill):
-                if seconds != clip_seconds():
-                    set_length(seconds)
-                for other in pills:
-                    cc.set_class(other, "selected", other is chosen)
-            pill.connect("clicked", choose)
-            length.pack_start(pill, False, False, 0)
-        panel.pack_start(length, False, False, 0)
+            def show(value):
+                for other, pill in pills.items():
+                    cc.set_class(pill, "selected", other == value)
+
+            for value, short, tip in options:
+                pill = cc.css_classes(Gtk.Button(label=short), "pill")
+                pill.set_valign(Gtk.Align.CENTER)
+                pill.set_tooltip_text(tip)
+                pills[value] = pill
+
+                def clicked(_button, value=value):
+                    if not pills[value].get_style_context().has_class("selected"):
+                        choose(value)
+                    show(value)
+                pill.connect("clicked", clicked)
+                row.pack_start(pill, False, False, 0)
+            show(current)
+            panel.pack_start(row, False, False, 0)
+            return pills, show
+
+        def short_time(seconds):
+            return f"{seconds}s" if seconds < 60 else f"{seconds // 60}m"
+
+        # Clip length: how far back Insert reaches
+        length_pills, show_length = pill_row(
+            "length", "Clip Length",
+            [(seconds, short_time(seconds), f"Save the last {length_name(seconds)}") for seconds in LENGTHS],
+            clip_seconds(), set_length)
+
+        def fit_lengths():
+            # A clip can't be longer than what's kept ready
+            for seconds, pill in length_pills.items():
+                pill.set_sensitive(seconds <= buffer_seconds())
+            show_length(clip_seconds())
+        fit_lengths()
+
+        # What the recorder holds in memory. Either change restarts it, which empties the buffer
+        pill_row("memory", "Keep Ready",
+                 [(seconds, short_time(seconds),
+                   f"Keep the last {length_name(seconds)} in memory" + (" (uses the least memory)" if seconds == min(BUFFERS) else ""))
+                  for seconds in BUFFERS],
+                 buffer_seconds(), lambda seconds: (set_recorder("buffer", seconds), fit_lengths()))
+        pill_row("quality", "Quality",
+                 [(quality, name, "Lower quality makes smaller clips and uses less memory") for quality, name in QUALITIES.items()],
+                 clip_quality(), lambda quality: set_recorder("quality", quality))
     else:
         note = label("Clips need gpu-screen-recorder: sudo pacman -S gpu-screen-recorder", "note")
         note.set_line_wrap(True)
