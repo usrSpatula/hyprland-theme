@@ -183,6 +183,123 @@ def clip_info(path):
     return (thumb if thumb.exists() else None), length
 
 
+# ---- Playing a clip ----
+
+def play(path, title):
+    """Opens a clip in the video player: mpv if it's installed, else whatever opens videos."""
+    command = ["xdg-open", str(path)]
+    if shutil.which("mpv"):
+        command = ["mpv", "--player-operation-mode=pseudo-gui", "--force-window=immediate",
+                   "--keep-open=yes", f"--title={title}", "--", str(path)]
+    subprocess.Popen(command, start_new_session=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+
+# ---- Shrinking a clip to fit a file size ----
+
+SHRINK_SIZES = (10, 25, 50, 100)        # MB, the sizes offered
+SHRINK_COSTS = {"quality": "Quality", "resolution": "Resolution"}   # what is given up to get there
+SHRINK_HEIGHTS = (1440, 1080, 900, 720, 540, 480, 360, 240)
+BITS_PER_PIXEL = 0.045    # below this a picture turns blocky; "resolution" shrinks the frame to keep it
+LEAST_VIDEO_KBPS = 120    # under this nothing watchable comes out
+
+
+def clip_details(path):
+    """A clip's length in seconds, frame size, frames a second and number of sound tracks."""
+    found = json.loads(run("ffprobe", "-v", "error", "-show_entries",
+                           "stream=codec_type,width,height,avg_frame_rate:format=duration",
+                           "-of", "json", str(path), timeout=10))
+    video = next(stream for stream in found["streams"] if stream["codec_type"] == "video")
+    over, under = video["avg_frame_rate"].split("/")
+    return {"length": float(found["format"]["duration"]), "width": video["width"], "height": video["height"],
+            "fps": float(over) / float(under) if float(under) else FPS,
+            "sounds": sum(1 for stream in found["streams"] if stream["codec_type"] == "audio")}
+
+
+def shrink_plan(details, megabytes, cost):
+    """How to fit a clip into this many MB: (video kbit/s, sound kbit/s per track, new height
+    or None to keep the frame size). None if the clip is too long to fit at all."""
+    budget = megabytes * 8000 * 0.965 / details["length"]   # a little is left for the file's own bookkeeping
+    sound = 128 if budget > 1500 else 96 if budget > 600 else 64
+    video = budget - sound * details["sounds"]
+    if video < LEAST_VIDEO_KBPS:
+        return None
+    height = None
+    if cost == "resolution":
+        # As many pixels as the bitrate can keep sharp, on the nearest usual frame size below
+        sharp = video * 1000 / (details["fps"] * BITS_PER_PIXEL)
+        fits = details["height"] * min(1.0, (sharp / (details["width"] * details["height"])) ** 0.5)
+        smaller = [step for step in SHRINK_HEIGHTS if step <= fits + 1 and step < details["height"]]
+        if fits < details["height"] - 1:
+            height = smaller[0] if smaller else SHRINK_HEIGHTS[-1]
+    return round(video), sound, height
+
+
+def shrink(path, target, megabytes, cost, progress=lambda fraction: None):
+    """Re-encodes a clip into target so that it's no bigger than megabytes. It's encoded
+    twice over (a look through, then the real thing), which is what lands on the size.
+    Returns None when done, or a short reason it couldn't be."""
+    try:
+        details = clip_details(path)
+    except (ValueError, KeyError, StopIteration, ZeroDivisionError):
+        return "Couldn't read the clip"
+    plan = shrink_plan(details, megabytes, cost)
+    if plan is None:
+        return f"Too long to fit in {megabytes} MB"
+    video, sound, height = plan
+    RUNTIME.mkdir(parents=True, exist_ok=True)
+    notes = str(RUNTIME / f"shrink-{os.getpid()}-{threading.get_ident()}")
+    partial = target.with_name(f".{target.stem}.part{target.suffix}")
+
+    def encode(step, video):
+        command = ["nice", "-n", "10", "ffmpeg", "-v", "error", "-nostats", "-progress", "pipe:1", "-y",
+                   "-i", str(path), "-map", "0:v:0", "-c:v", "libx264", "-preset", "faster",
+                   "-b:v", f"{video}k", "-pix_fmt", "yuv420p", "-pass", str(step), "-passlogfile", notes]
+        if height:
+            command += ["-vf", f"scale=-2:{height}"]
+        if step == 1:
+            command += ["-an", "-f", "null", "/dev/null"]
+        else:
+            command += ["-map", "0:a?", "-c:a", "aac", "-b:a", f"{sound}k", "-movflags", "+faststart",
+                        str(partial)]
+        process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)
+        for line in process.stdout:
+            if line.startswith("out_time_us="):
+                try:
+                    done = int(line.split("=")[1]) / 1e6 / details["length"]
+                except ValueError:
+                    continue
+                progress(min(1.0, (step - 1 + max(0.0, min(done, 1.0))) / 2))
+        return process.wait() == 0
+
+    try:
+        if not (encode(1, video) and encode(2, video)):
+            return "The encoder stopped"
+        size = partial.stat().st_size
+        if size > megabytes * 1e6:
+            # Rare: it came out a little over, so the real pass is run again a little lower
+            if not encode(2, round(video * megabytes * 1e6 / size * 0.97)) or \
+                    partial.stat().st_size > megabytes * 1e6:
+                return "Couldn't get it that small"
+        partial.rename(target)
+        return None
+    except OSError:
+        return "Couldn't write the file"
+    finally:
+        partial.unlink(missing_ok=True)
+        for leftover in Path(notes).parent.glob(Path(notes).name + "*"):
+            leftover.unlink(missing_ok=True)
+
+
+def shrunk_path(path, megabytes):
+    """Where a shrunk copy goes: beside the clip, with the size in its name."""
+    target = path.with_name(f"{path.stem} {megabytes}MB.mp4")
+    number = 2
+    while target.exists():
+        target = path.with_name(f"{path.stem} {megabytes}MB {number}.mp4")
+        number += 1
+    return target
+
+
 # ---- The replay buffers (--daemon) ----
 
 def pulse_notch():
@@ -485,6 +602,10 @@ button.pill {
 }
 button.pill:hover { background-color: rgba(255, 255, 255, 0.15); }
 button.pill.selected, button.pill.selected:hover { background-color: #0a84ff; }
+button.pill:disabled { color: rgba(255, 255, 255, 0.3); }
+.shrink { margin: 8px 2px 1px 2px; }
+.shrink-label { font-size: 10px; font-weight: 600; color: rgba(255, 255, 255, 0.55); min-width: 52px; }
+entry.megabytes { min-width: 0; padding: 1px 6px; font-size: 11px; font-weight: 500; border-radius: 10px; }
 scrolledwindow, viewport { background-color: transparent; border: none; }
 scrollbar { background-color: transparent; border: none; }
 scrollbar slider {
@@ -542,7 +663,7 @@ def build_browser(cc, Gtk, GLib, close):
 
     cc.ICONS.update({"film": FILM_ICON, "folder": "", "trash": "", "clip": CLIP_ICON, "length": "\uf2f2",
                      "quality": "\uf1de",
-                     "pencil": "\uf303", "copy": "\uf0c5", "check": "\uf00c"})
+                     "pencil": "\uf303", "copy": "\uf0c5", "check": "\uf00c", "shrink": "\uf066"})
     panel = cc.css_classes(Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8), "panel")
     panel.set_size_request(PANEL_WIDTH, -1)
     clips = list_clips()
@@ -550,6 +671,31 @@ def build_browser(cc, Gtk, GLib, close):
 
     def label(text, css_class, xalign=0):
         return cc.css_classes(Gtk.Label(label=text, xalign=xalign), css_class)
+
+    def pill_group(options, current, choose, spacing=5):
+        """A row of choices, one of them lit. options is [(value, short label)]; choose(value)
+        is called on a new pick. Returns the row and a function that lights a choice."""
+        group = Gtk.Box(spacing=spacing)
+        pills = {}
+
+        def show(value):
+            for other, pill in pills.items():
+                cc.set_class(pill, "selected", other == value)
+
+        for value, short in options:
+            pill = cc.css_classes(Gtk.Button(label=short), "pill")
+            pill.set_valign(Gtk.Align.CENTER)
+            pills[value] = pill
+
+            def clicked(_button, value=value):
+                if not pills[value].get_style_context().has_class("selected"):
+                    choose(value)
+                show(value)
+            pill.connect("clicked", clicked)
+            group.pack_start(pill, False, False, 0)
+        show(current)
+        group.pills = pills
+        return group, show
 
     # Header: how many clips, how much space, and a button for the folder
     header = cc.css_classes(Gtk.Box(spacing=11), "tile")
@@ -599,24 +745,7 @@ def build_browser(cc, Gtk, GLib, close):
             row = cc.css_classes(Gtk.Box(spacing=9), "tile")
             row.pack_start(cc.icon_label(icon, "length-icon"), False, False, 0)
             row.pack_start(label(title, "tile-title"), True, True, 0)
-            pills = {}
-
-            def show(value):
-                for other, pill in pills.items():
-                    cc.set_class(pill, "selected", other == value)
-
-            for value, short in options:
-                pill = cc.css_classes(Gtk.Button(label=short), "pill")
-                pill.set_valign(Gtk.Align.CENTER)
-                pills[value] = pill
-
-                def clicked(_button, value=value):
-                    if not pills[value].get_style_context().has_class("selected"):
-                        choose(value)
-                    show(value)
-                pill.connect("clicked", clicked)
-                row.pack_start(pill, False, False, 0)
-            show(current)
+            row.pack_start(pill_group(options, current, choose, 9)[0], False, False, 0)
             panel.pack_start(row, False, False, 0)
 
         # Clip length: how far back Insert reaches
@@ -657,6 +786,7 @@ def build_browser(cc, Gtk, GLib, close):
     panel.pack_start(scroller, False, False, 0)
 
     headings = {}     # day -> (heading label, [row widgets])
+    stopped = threading.Event()   # set when the panel closes; work still running lets go of it
 
     def draw_thumb(area, cr, entry):
         radius = 6
@@ -751,11 +881,152 @@ def build_browser(cc, Gtk, GLib, close):
         button.set_tooltip_text(tooltip)
         return button
 
+    def fit_list():
+        # Tall enough for every clip, up to LIST_HEIGHT, then it scrolls
+        scroller.set_min_content_height(min(rows.get_preferred_height()[1], LIST_HEIGHT))
+        return False
+
+    # ---- Shrinking: a strip under a clip with the size to aim for and what to give up ----
+
+    def open_strip(entry, strip, details, sub):
+        if strip.get_child():
+            strip.set_reveal_child(not strip.get_reveal_child())
+            return
+        settings = read_settings()
+        choice = {"megabytes": settings.get("shrink_megabytes", SHRINK_SIZES[0]),
+                  "cost": settings.get("shrink_cost", "quality")}
+        if choice["cost"] not in SHRINK_COSTS:
+            choice["cost"] = "quality"
+        # Clicks on the strip are its own, not a click on the clip (which would play it)
+        holder = Gtk.EventBox()
+        holder.set_visible_window(False)
+        holder.connect("button-release-event", lambda *_: True)
+        box = cc.css_classes(Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6), "shrink")
+        holder.add(box)
+
+        def line(title, *widgets):
+            row = Gtk.Box(spacing=5)
+            row.pack_start(label(title, "shrink-label"), False, False, 0)
+            for widget in widgets:
+                row.pack_start(widget, False, False, 0)
+            box.pack_start(row, False, False, 0)
+            return row
+
+        def pick_size(megabytes):
+            choice["megabytes"] = megabytes
+            custom.set_text("")
+
+        def typed(*_):
+            try:
+                megabytes = int(custom.get_text())
+            except ValueError:
+                return
+            if megabytes > 0:
+                choice["megabytes"] = megabytes
+                light_size(megabytes)
+
+        sizes, light_size = pill_group([(size, f"{size} MB") for size in SHRINK_SIZES],
+                                       choice["megabytes"], pick_size)
+        custom = cc.css_classes(Gtk.Entry(), "rename", "megabytes")
+        custom.set_width_chars(5)
+        custom.set_max_length(5)
+        custom.set_placeholder_text("Other")
+        custom.set_input_purpose(Gtk.InputPurpose.DIGITS)
+        custom.set_valign(Gtk.Align.CENTER)
+        if choice["megabytes"] not in SHRINK_SIZES:
+            custom.set_text(str(choice["megabytes"]))
+        custom.connect("changed", typed)
+        line("Fit into", sizes, custom)
+        costs, _light = pill_group(list(SHRINK_COSTS.items()), choice["cost"],
+                                   lambda cost: choice.update(cost=cost))
+        go = cc.css_classes(Gtk.Button(label="Shrink"), "pill", "selected")
+        go.set_valign(Gtk.Align.CENTER)
+        costs_line = line("Give up", costs)
+        costs_line.pack_end(go, False, False, 0)
+
+        def start(*_):
+            megabytes, cost = choice["megabytes"], choice["cost"]
+            if megabytes * 1e6 >= entry["path"].stat().st_size:
+                details.set_text(f"Already under {megabytes} MB")
+                GLib.timeout_add(2000, lambda: (not stopped.is_set() and details.set_text(sub), False)[1])
+                return
+            write_setting("shrink_megabytes", megabytes)
+            write_setting("shrink_cost", cost)
+            strip.set_reveal_child(False)
+            go.set_sensitive(False)
+            source, target = entry["path"], shrunk_path(entry["path"], megabytes)
+
+            def show(text):
+                if not stopped.is_set():
+                    details.set_text(text)
+                return False
+
+            def progress(fraction, last=[-1]):
+                percent = round(fraction * 100)
+                if percent != last[0]:
+                    last[0] = percent
+                    GLib.idle_add(show, f"Shrinking to {megabytes} MB  ·  {percent}%")
+
+            def work():
+                problem = shrink(source, target, megabytes, cost, progress)
+                GLib.idle_add(finished, problem)
+
+            def finished(problem):
+                if problem:
+                    notify("Couldn't shrink the clip", problem)
+                else:
+                    notify("Clip shrunk", f"{target.stem}  ·  {file_size(target.stat().st_size)}")
+                    cc.sound("clip")
+                if stopped.is_set():
+                    return False
+                go.set_sensitive(True)
+                details.set_text(problem or sub)
+                if problem:
+                    GLib.timeout_add(3000, show, sub)
+                else:
+                    add_copy(entry, target)
+                return False
+
+            progress(0.0)
+            threading.Thread(target=work, daemon=True).start()
+
+        go.connect("clicked", start)
+        strip.add(holder)
+        strip.connect("notify::child-revealed", lambda *_: stopped.is_set() or fit_list())
+        holder.show_all()
+        strip.set_reveal_child(True)
+
+    def add_copy(original, path):
+        """Puts a freshly shrunk copy in the list, right under the clip it was made from."""
+        title = next((title for _when, title, found in list_clips() if found == path), path.stem)
+        entry = {"when": original["when"], "title": title, "path": path, "pixbuf": None, "length": None,
+                 "frame": None, "player": None}
+        entries.insert(entries.index(original) + 1, entry)
+        row = build_row(entry)
+        _heading, day_rows = headings[entry["when"].date()]
+        day_rows.append(row)
+        rows.pack_start(row, False, False, 0)
+        rows.reorder_child(row, rows.get_children().index(original["row"]) + 1)
+        row.show_all()
+        update_summary()
+        fit_list()
+
+        def load():
+            try:
+                thumb, length = clip_info(path)
+            except OSError:
+                return
+            GLib.idle_add(lambda: (not stopped.is_set() and show_thumb(entry, thumb, length), False)[1])
+        threading.Thread(target=load, daemon=True).start()
+
     def build_row(entry):
         area = Gtk.EventBox()
         area.set_visible_window(False)
-        row = cc.css_classes(Gtk.Box(spacing=10), "tile", "clip-row")
-        area.add(row)
+        column = cc.css_classes(Gtk.Box(orientation=Gtk.Orientation.VERTICAL), "tile", "clip-row")
+        row = Gtk.Box(spacing=10)
+        column.pack_start(row, False, False, 0)
+        area.add(column)
+        entry["row"] = area
 
         thumb_box = Gtk.EventBox()
         thumb_box.set_visible_window(False)
@@ -784,7 +1055,8 @@ def build_browser(cc, Gtk, GLib, close):
         name.set_ellipsize(Pango.EllipsizeMode.END)
         text.pack_start(name, False, False, 0)
         sub = f"{entry['when'].strftime('%-I:%M %p')}  ·  {file_size(entry['path'].stat().st_size)}"
-        text.pack_start(label(sub, "clip-sub"), False, False, 0)
+        details = label(sub, "clip-sub")
+        text.pack_start(details, False, False, 0)
         row.pack_start(text, True, True, 0)
 
         # Rename: the title turns into a text box. Enter saves, Esc cancels
@@ -823,6 +1095,15 @@ def build_browser(cc, Gtk, GLib, close):
 
         rename.connect("clicked", on_rename)
         row.pack_start(rename, False, False, 0)
+
+        # Shrink: opens a strip under the clip for making a copy that fits a file size
+        shrink_button = action_button("shrink", "Shrink to a file size")
+        strip = Gtk.Revealer()
+        strip.set_transition_type(Gtk.RevealerTransitionType.SLIDE_DOWN)
+        strip.set_transition_duration(180)
+        column.pack_start(strip, False, False, 0)
+        shrink_button.connect("clicked", lambda *_: open_strip(entry, strip, details, sub))
+        row.pack_start(shrink_button, False, False, 0)
 
         # Copy: puts the clip file on the clipboard, ready to paste into Discord or a browser
         copy = action_button("copy", "Copy to clipboard")
@@ -872,12 +1153,12 @@ def build_browser(cc, Gtk, GLib, close):
 
         def on_hover(_area, event, inside):
             if event.detail != Gdk.NotifyType.INFERIOR:
-                cc.set_class(row, "hover", inside)
+                cc.set_class(column, "hover", inside)
 
         def on_click(_area, event):
             if event.button == 1 and not editing["cancel"]:
                 stop_preview(entry)
-                cc.spawn("xdg-open", str(entry["path"]))
+                play(entry["path"], entry["title"])
                 close()
 
         area.connect("enter-notify-event", on_hover, True)
@@ -896,7 +1177,6 @@ def build_browser(cc, Gtk, GLib, close):
         rows.pack_start(row, False, False, 0)
 
     # Thumbnails and lengths load in the background, newest first
-    stopped = threading.Event()
 
     def load_thumbs():
         for entry in list(entries):
@@ -929,9 +1209,8 @@ def build_browser(cc, Gtk, GLib, close):
         for entry in entries:
             stop_preview(entry)
 
-    # Tall enough for every clip, up to LIST_HEIGHT, then it scrolls
     rows.show_all()
-    scroller.set_min_content_height(min(rows.get_preferred_height()[1], LIST_HEIGHT))
+    fit_list()
 
     threading.Thread(target=load_thumbs, daemon=True).start()
     return panel, timers, cleanup
