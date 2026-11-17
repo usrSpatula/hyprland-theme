@@ -586,6 +586,8 @@ hl.on("hyprland.start", function()
     hl.exec_cmd("waybar")
     hl.exec_cmd("swaybg -i $HOME/.config/hypr/wallpaper.jpg -m fill")
     hl.exec_cmd("mako")
+    -- The window that asks for your password when an app needs it (mounting a drive, settings)
+    hl.exec_cmd("systemctl --user start hyprpolkitagent")
     -- Starts the bar's panels hidden, so the first click on one opens it at once
     hl.exec_cmd("sleep 3; $HOME/.local/bin/panel --warm")
     -- Puts back the lighting chosen in RGB Controller (it does nothing until you've used the app)

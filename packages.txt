@@ -2,6 +2,11 @@
 
 # Desktop
 hyprland
+hyprpolkitagent
+hyprland-guiutils
+hyprland-qt-support
+qt5-wayland
+qt6-wayland
 xdg-desktop-portal-hyprland
 xdg-desktop-portal-gtk
 waybar
