@@ -50,6 +50,9 @@ IDLE_SECONDS = 1.5    # and one on a hidden desktop, which isn't drawing anythin
 CAMERAS = 1           # how many windows are pictured at the same time
 REDRAW_MARGIN = 120   # how far past a desktop its shadow, lean and growth can reach
 STILL_MARGIN = 72     # room around a desktop's kept picture for its shadow
+HOLD_MS = 160         # holding the button on a window this long picks it up to be dragged
+DRAG_START = 10       # ... as does moving this far with the button held
+DRAG_MARGIN = 48      # how far past a carried window its shadow and growth reach
 
 # Kept between openings, so the overview has something to show the instant it opens
 pictures = {}         # window address -> (width, height, its picture at that size)
@@ -168,12 +171,19 @@ def read_desktops():
 
 def open_overview(app, on_closed):
     desktops, active, showing, focused = read_desktops()
-    if focused:
-        # One more box after the real desktops: a plus, which opens the first unused desktop
-        taken = {desktop["id"] for desktop in desktops}
-        fresh = next(number for number in range(1, len(taken) + 2) if number not in taken)
-        desktops.append({"id": fresh, "monitor": focused, "windows": [], "new": True})
-    state = {"spots": [], "cards": [], "current": None, "closing": False, "size": None}
+
+    def add_new_desktop(desktops):
+        if focused:
+            # One more box after the real desktops: a plus, which opens the first unused desktop
+            taken = {desktop["id"] for desktop in desktops}
+            fresh = next(number for number in range(1, len(taken) + 2) if number not in taken)
+            desktops.append({"id": fresh, "monitor": focused, "windows": [], "new": True})
+
+    add_new_desktop(desktops)
+    # press is the mouse button being held (and what it went down on); drag is the window being
+    # carried, if any; hidden is a window just dropped, until Hyprland says where it ended up
+    state = {"spots": [], "cards": [], "current": None, "closing": False, "size": None,
+             "press": None, "drag": None, "hidden": None}
     # Everything that moves has a number that chases a target a little each frame:
     #   lift[key]   how far a desktop or window has come forward (0 at rest, 1 under the mouse);
     #               it's on a spring, so it eases in and settles
@@ -222,6 +232,7 @@ def open_overview(app, on_closed):
     def close(*_):
         if not state["closing"]:
             state["closing"] = True
+            forget_press()
             write_frame_log()
             cameras.shutdown(wait=False, cancel_futures=True)
             cc.sound("close")
@@ -331,7 +342,10 @@ def open_overview(app, on_closed):
         state["cards"], state["spots"] = cards, spots
 
     def windows_of(desktop):
-        return [spot for spot in state["spots"] if spot["desktop"] == desktop["id"] and "window" in spot]
+        """The windows drawn on a desktop: all of its own, but not one that's being carried."""
+        away = {state["hidden"], state["drag"]["spot"]["window"]["address"] if state["drag"] else None}
+        return [spot for spot in state["spots"] if spot["desktop"] == desktop["id"] and "window" in spot
+                and spot["window"]["address"] not in away]
 
     # ---- Motion ----
 
@@ -679,6 +693,9 @@ def open_overview(app, on_closed):
                     and card["y"] - REDRAW_MARGIN < bottom
                     and card["y"] + card["h"] + REDRAW_MARGIN + LABEL_HEIGHT > top):
                 draw_card(cr, card, focus)
+        if state["drag"]:
+            # The window being carried, above everything, under the mouse
+            draw_window(cr, carried(), 1.0)
         return True
 
     # ---- Mouse and keyboard ----
@@ -703,13 +720,122 @@ def open_overview(app, on_closed):
 
     def on_motion(_area, event):
         motion["pointer"] = (event.x, event.y)
-        select(spot_at(event.x, event.y))
+        press = state["press"]
+        if (press and press["timer"]
+                and math.hypot(event.x - press["x"], event.y - press["y"]) > DRAG_START):
+            pick_up()
+        if state["drag"]:
+            smudge_carried()
+            state["drag"]["at"] = (event.x, event.y)
+            smudge_carried()
+            select(card_at(event.x, event.y))
+        else:
+            select(spot_at(event.x, event.y))
         return True
 
-    def on_click(_area, event):
+    # ---- Carrying a window to another desktop ----
+
+    def card_at(x, y):
+        """The desktop under this point, whatever window of it is there."""
+        for spot in state["spots"]:
+            if ("window" not in spot and spot["x"] <= x <= spot["x"] + spot["w"]
+                    and spot["y"] <= y <= spot["y"] + spot["h"]):
+                return spot
+        return None
+
+    def carried():
+        """The carried window's place right now: it stays under the mouse where it was grabbed."""
+        drag = state["drag"]
+        return dict(drag["spot"], x=round(drag["at"][0] - drag["dx"]), y=round(drag["at"][1] - drag["dy"]))
+
+    def smudge_carried():
+        spot = carried()
+        area.queue_draw_area(spot["x"] - DRAG_MARGIN, spot["y"] - DRAG_MARGIN,
+                             spot["w"] + 2 * DRAG_MARGIN, spot["h"] + 2 * DRAG_MARGIN)
+
+    def forget_press():
+        press, state["press"] = state["press"], None
+        if press and press["timer"]:
+            GLib.source_remove(press["timer"])
+        return press
+
+    def pick_up():
+        """Starts carrying the window the button is being held on."""
+        press = state["press"]
+        if press["timer"]:
+            GLib.source_remove(press["timer"])
+            press["timer"] = 0
+        spot = press["spot"]
+        at = motion["pointer"] or (press["x"], press["y"])
+        state["drag"] = {"spot": spot, "dx": press["x"] - spot["x"], "dy": press["y"] - spot["y"], "at": at}
+        cc.sound("volume")
+        select(card_at(*at))
+        area.queue_draw()
+        return False
+
+    def put_back():
+        state["drag"] = None
+        if motion["pointer"]:
+            select(spot_at(*motion["pointer"]))
+        area.queue_draw()
+
+    def drop():
+        """Lets go of the carried window: onto another desktop moves it there, anywhere else
+        puts it back."""
+        drag = state["drag"]
+        target = card_at(*drag["at"])
+        if not target or target["desktop"] == drag["spot"]["desktop"]:
+            put_back()
+            return
+        address = drag["spot"]["window"]["address"]
+        state["drag"], state["hidden"] = None, address
+        subprocess.run(["hyprctl", "dispatch", f'hl.dsp.window.move({{ workspace = {target["desktop"]}, '
+                        f'follow = false, window = "address:{address}" }})'],
+                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        cc.sound("on")
+        area.queue_draw()
+        # Hyprland rearranges both desktops; once it has, the overview is laid out afresh
+        GLib.timeout_add(140, reread)
+
+    def reread():
+        if state["closing"]:
+            return False
+        fresh, now_active, now_showing, _focused = read_desktops()
+        if active and now_active != active:
+            # The move took you along with the window: back to the desktop you were on
+            dispatch(f'hl.dsp.focus({{ workspace = {next(iter(active))} }})')
+            now_showing = (now_showing - now_active) | active
+        add_new_desktop(fresh)
+        desktops[:] = fresh
+        showing.clear()
+        showing.update(now_showing)
+        state["hidden"] = state["current"] = None
+        stills.clear()
+        if state["size"]:
+            layout(*state["size"])
+        if motion["pointer"]:
+            select(spot_at(*motion["pointer"]))
+        area.queue_draw()
+        return False
+
+    def on_press(_area, event):
+        if event.type != Gdk.EventType.BUTTON_PRESS or state["drag"]:
+            return True
+        forget_press()
         spot = spot_at(event.x, event.y)
-        if spot and event.button == 1:
-            go(spot)
+        state["press"] = press = {"spot": spot, "x": event.x, "y": event.y, "button": event.button, "timer": 0}
+        if spot and "window" in spot and event.button == 1:
+            press["timer"] = GLib.timeout_add(HOLD_MS, pick_up)
+        return True
+
+    def on_release(_area, event):
+        press = forget_press()
+        if state["drag"]:
+            drop()
+        elif press is None:
+            pass
+        elif press["spot"] and press["button"] == 1:
+            go(press["spot"])
         else:
             close()
         return True
@@ -717,7 +843,12 @@ def open_overview(app, on_closed):
     def on_key(_window, event):
         key = event.keyval
         windows = [spot for spot in state["spots"] if "window" in spot]
-        if key == Gdk.KEY_Escape:
+        if state["drag"]:
+            # Escape puts a carried window back; other keys wait until it's let go
+            if key == Gdk.KEY_Escape:
+                forget_press()
+                put_back()
+        elif key == Gdk.KEY_Escape:
             close()
         elif key in (Gdk.KEY_Return, Gdk.KEY_KP_Enter, Gdk.KEY_space) and state["current"]:
             go(state["current"])
@@ -733,10 +864,12 @@ def open_overview(app, on_closed):
                 go({"desktop": number})
         return True
 
-    area.add_events(Gdk.EventMask.POINTER_MOTION_MASK | Gdk.EventMask.BUTTON_PRESS_MASK)
+    area.add_events(Gdk.EventMask.POINTER_MOTION_MASK | Gdk.EventMask.BUTTON_PRESS_MASK
+                    | Gdk.EventMask.BUTTON_RELEASE_MASK)
     area.connect("draw", draw)
     area.connect("motion-notify-event", on_motion)
-    area.connect("button-press-event", on_click)
+    area.connect("button-press-event", on_press)
+    area.connect("button-release-event", on_release)
     window.connect("key-press-event", on_key)
     window.connect("destroy", lambda *_: (state.update(closing=True), on_closed()))
 
