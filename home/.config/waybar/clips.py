@@ -188,8 +188,11 @@ class Recorders:
         # Portal capture: Hyprland hands over each frame. Capturing straight from the GPU
         # (-w <monitor>, KMS) made the desktop stutter while recording. "-fm content" only
         # encodes when the screen actually changes. The monitor comes from share-picker.sh.
+        # Sound: everything you hear (games, and Discord, which plays through the same device)
+        # mixed with your microphone, so your own voice is in the clip too
         return [RECORDER, "-w", "portal", "-fm", "content", "-f", str(FPS), "-r", str(BUFFER_SECONDS),
-                "-c", "mp4", "-k", "h264", "-ac", "aac", "-q", "very_high", "-a", "default_output",
+                "-c", "mp4", "-k", "h264", "-ac", "aac", "-q", "very_high",
+                "-a", "default_output|default_input",
                 "-v", "no", "-o", str(INCOMING)]
 
     def start(self, monitor):
