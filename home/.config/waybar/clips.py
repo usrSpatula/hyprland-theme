@@ -36,7 +36,7 @@ LOG = RUNTIME / "recorder.log"
 # Tells ~/.config/hypr/share-picker.sh which monitor the next portal request is for
 PORTAL_REQUEST = RUNTIME / "portal-request"
 PORTAL_ANSWER_SECONDS = 4
-# What you picked in the panel: clip length, quality, and how much is kept ready
+# What you picked in the panel: clip length and quality
 SETTINGS = Path.home() / ".config" / "clips" / "settings.json"
 
 RECORDER = "gpu-screen-recorder"
@@ -50,10 +50,10 @@ DEFAULT_SECONDS = 30
 # minute on the desktop, up to ~100 MB a minute in a busy game.
 SAVE_SIGNALS = {10: 1, 30: 2, 60: 3, 300: 4}   # seconds -> SIGRTMIN + n
 LENGTHS = tuple(SAVE_SIGNALS)
-# How much the recorder keeps ready, and how good the picture is. Both decide how much memory
-# the buffer takes; changing either restarts the recorder, which empties the buffer.
-BUFFERS = (60, 300)
-DEFAULT_BUFFER = max(BUFFERS)
+# The recorder keeps only as much as the clip length needs: a minute for any length up to a
+# minute, five for the longest. That and the picture quality decide how much memory the buffer
+# takes. Changing either restarts the recorder, which empties the buffer.
+SHORT_BUFFER = 60
 QUALITIES = {"medium": "Medium", "high": "High", "very_high": "Best"}   # gpu-screen-recorder's -q
 DEFAULT_QUALITY = "very_high"
 FPS = 60
@@ -133,10 +133,10 @@ def read_settings():
     return settings if isinstance(settings, dict) else {}
 
 
-def buffer_seconds():
-    """How far back the recorder keeps, as picked in the panel."""
-    seconds = read_settings().get("buffer")
-    return seconds if seconds in BUFFERS else DEFAULT_BUFFER
+def buffer_seconds(length=None):
+    """How far back the recorder keeps, for a clip length (the one picked, if none is given)."""
+    length = clip_seconds() if length is None else length
+    return SHORT_BUFFER if length <= SHORT_BUFFER else max(LENGTHS)
 
 
 def clip_quality():
@@ -145,10 +145,9 @@ def clip_quality():
 
 
 def clip_seconds():
-    """How long a saved clip is, as picked in the panel. Never longer than what's kept."""
+    """How long a saved clip is, as picked in the panel."""
     seconds = read_settings().get("seconds")
-    seconds = seconds if seconds in LENGTHS else DEFAULT_SECONDS
-    return min(seconds, buffer_seconds())
+    return seconds if seconds in LENGTHS else DEFAULT_SECONDS
 
 
 def length_name(seconds):
@@ -396,12 +395,16 @@ def write_setting(key, value):
 
 
 def set_length(seconds):
-    # Read at each save, so it takes effect straight away
-    write_setting("seconds", seconds)
+    # Read at each save, so it takes effect straight away. Only going to or from the longest
+    # length changes how much the recorder has to keep, and so restarts it
+    if buffer_seconds(seconds) != buffer_seconds():
+        set_recorder("seconds", seconds)
+    else:
+        write_setting("seconds", seconds)
 
 
 def set_recorder(key, value):
-    """Changes the quality or how much is kept, and has the recorder start again with it."""
+    """Changes a setting the recorder is started with, and has it start again."""
     write_setting(key, value)
     pid = daemon_pid()
     if pid:
@@ -482,7 +485,6 @@ button.pill {
 }
 button.pill:hover { background-color: rgba(255, 255, 255, 0.15); }
 button.pill.selected, button.pill.selected:hover { background-color: #0a84ff; }
-button.pill:disabled { opacity: 0.35; }
 scrolledwindow, viewport { background-color: transparent; border: none; }
 scrollbar { background-color: transparent; border: none; }
 scrollbar slider {
@@ -539,7 +541,7 @@ def build_browser(cc, Gtk, GLib, close):
     from gi.repository import Gdk, GdkPixbuf, Pango
 
     cc.ICONS.update({"film": FILM_ICON, "folder": "", "trash": "", "clip": CLIP_ICON, "length": "\uf2f2",
-                     "quality": "\uf1de", "memory": "\uf538",
+                     "quality": "\uf1de",
                      "pencil": "\uf303", "copy": "\uf0c5", "check": "\uf00c"})
     panel = cc.css_classes(Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8), "panel")
     panel.set_size_request(PANEL_WIDTH, -1)
@@ -593,7 +595,7 @@ def build_browser(cc, Gtk, GLib, close):
 
         def pill_row(icon, title, options, current, choose):
             """A tile with a title and a row of choices, one of them lit. options is
-            [(value, short label, tooltip)]; choose(value) is called on a new pick."""
+            [(value, short label)]; choose(value) is called on a new pick."""
             row = cc.css_classes(Gtk.Box(spacing=9), "tile")
             row.pack_start(cc.icon_label(icon, "length-icon"), False, False, 0)
             row.pack_start(label(title, "tile-title"), True, True, 0)
@@ -603,10 +605,9 @@ def build_browser(cc, Gtk, GLib, close):
                 for other, pill in pills.items():
                     cc.set_class(pill, "selected", other == value)
 
-            for value, short, tip in options:
+            for value, short in options:
                 pill = cc.css_classes(Gtk.Button(label=short), "pill")
                 pill.set_valign(Gtk.Align.CENTER)
-                pill.set_tooltip_text(tip)
                 pills[value] = pill
 
                 def clicked(_button, value=value):
@@ -617,33 +618,13 @@ def build_browser(cc, Gtk, GLib, close):
                 row.pack_start(pill, False, False, 0)
             show(current)
             panel.pack_start(row, False, False, 0)
-            return pills, show
-
-        def short_time(seconds):
-            return f"{seconds}s" if seconds < 60 else f"{seconds // 60}m"
 
         # Clip length: how far back Insert reaches
-        length_pills, show_length = pill_row(
-            "length", "Clip Length",
-            [(seconds, short_time(seconds), f"Save the last {length_name(seconds)}") for seconds in LENGTHS],
-            clip_seconds(), set_length)
-
-        def fit_lengths():
-            # A clip can't be longer than what's kept ready
-            for seconds, pill in length_pills.items():
-                pill.set_sensitive(seconds <= buffer_seconds())
-            show_length(clip_seconds())
-        fit_lengths()
-
-        # What the recorder holds in memory. Either change restarts it, which empties the buffer
-        pill_row("memory", "Keep Ready",
-                 [(seconds, short_time(seconds),
-                   f"Keep the last {length_name(seconds)} in memory" + (" (uses the least memory)" if seconds == min(BUFFERS) else ""))
-                  for seconds in BUFFERS],
-                 buffer_seconds(), lambda seconds: (set_recorder("buffer", seconds), fit_lengths()))
-        pill_row("quality", "Quality",
-                 [(quality, name, "Lower quality makes smaller clips and uses less memory") for quality, name in QUALITIES.items()],
-                 clip_quality(), lambda quality: set_recorder("quality", quality))
+        pill_row("length", "Clip Length",
+                 [(seconds, f"{seconds}s" if seconds < 60 else f"{seconds // 60}m") for seconds in LENGTHS],
+                 clip_seconds(), set_length)
+        pill_row("quality", "Quality", list(QUALITIES.items()), clip_quality(),
+                 lambda quality: set_recorder("quality", quality))
     else:
         note = label("Clips need gpu-screen-recorder: sudo pacman -S gpu-screen-recorder", "note")
         note.set_line_wrap(True)
